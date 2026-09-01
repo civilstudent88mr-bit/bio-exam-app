@@ -7,6 +7,7 @@ import {
   Plus, Search, Edit2, Trash2, FileUp, Download, Sparkles, FileText, Filter, BookMarked, Loader2, FileSpreadsheet, Eye, Settings, X, ClipboardPaste, Image as ImageIcon,
 } from 'lucide-react';
 import type { Question, Grade, Difficulty, QuestionType } from '@/types';
+import { OPTION_LABELS, OPTION_NUMBERS } from '@/types';
 import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions } from '@/services/api';
 import { parseCsv, parseFile, downloadSampleCsv, downloadSampleExcel } from '@/services/import';
 import { extractFromText, extractFromImages, fileToBase64, getApiKey, setApiKey } from '@/services/aiImport';
@@ -217,7 +218,7 @@ export function QuestionBank() {
                       <div key={i} className={`flex items-center gap-1.5 ${i === q.correctAnswer ? 'text-success-600 font-bold' : 'text-muted'}`}>
                         <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0"
                           style={{ backgroundColor: i === q.correctAnswer ? 'rgb(34 197 94 / 0.15)' : 'rgb(var(--color-border) / 0.4)' }}>
-                          {'الف‌ب‌ج‌د'[i]}
+                          {OPTION_LABELS[i]}
                         </span>
                         {o}
                       </div>
@@ -245,14 +246,14 @@ export function QuestionBank() {
           <Field label="متن سوال">
             <textarea className="input min-h-[80px]" value={form.text} onChange={e => setForm({ ...form, text: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" dir="rtl">
             {form.options.map((opt, i) => (
-              <Field key={i} label={`گزینه ${'الف‌ب‌ج‌د'[i]}`}>
+              <Field key={i} label={`گزینه ${OPTION_NUMBERS[i]} (${OPTION_LABELS[i]})`}>
                 <div className="flex gap-2">
-                  <input className="input" value={opt} onChange={e => {
+                  <input className="input flex-1" value={opt} onChange={e => {
                     const opts = [...form.options]; opts[i] = e.target.value; setForm({ ...form, options: opts as [string, string, string, string] });
                   }} />
-                  <button type="button" className={`btn px-3 ${form.correctAnswer === i ? 'bg-success-500 text-white' : 'btn-outline'}`}
+                  <button type="button" className={`btn px-3 shrink-0 ${form.correctAnswer === i ? 'bg-success-500 text-white' : 'btn-outline'}`}
                     onClick={() => setForm({ ...form, correctAnswer: i as 0 | 1 | 2 | 3 })}>
                     صحیح
                   </button>
@@ -330,7 +331,7 @@ export function QuestionBank() {
                     <div key={i} className={`flex items-center gap-1.5 ${i === q.correctAnswer ? 'text-success-600 font-bold' : 'text-muted'}`}>
                       <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0"
                         style={{ backgroundColor: i === q.correctAnswer ? 'rgb(34 197 94 / 0.15)' : 'rgb(var(--color-border) / 0.4)' }}>
-                        {'الف‌ب‌ج‌د'[i]}
+                        {OPTION_LABELS[i]}
                       </span>
                       {o}
                     </div>

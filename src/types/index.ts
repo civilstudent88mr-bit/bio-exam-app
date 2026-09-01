@@ -48,6 +48,9 @@ export type Grade = 'دهم' | 'یازدهم' | 'دوازدهم';
 export type Difficulty = 'ساده' | 'متوسط' | 'چالشی';
 export type QuestionType = 'مفهومی' | 'خط‌به‌خط' | 'ترکیبی' | 'شکل‌دار' | 'شمارشی';
 
+export const OPTION_LABELS = ['الف', 'ب', 'ج', 'د'] as const;
+export const OPTION_NUMBERS = ['۱', '۲', '۳', '۴'] as const;
+
 export interface Question {
   id: ID;
   text: string;

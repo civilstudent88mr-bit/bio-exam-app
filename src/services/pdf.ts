@@ -1,4 +1,5 @@
 import type { Question, ExamAttempt } from '@/types';
+import { OPTION_LABELS } from '@/types';
 
 // Lightweight PDF generator — produces a printable HTML document and
 // triggers the browser print dialog (user can "Save as PDF").
@@ -59,7 +60,7 @@ export function printExamPaper(title: string, code: string, questions: Question[
     <div class="q">
       <span class="num">${i + 1}.</span> ${q.text}
       <ul class="opts">
-        ${q.options.map((o, idx) => `<li><span class="opt-label">${'الف‌ب‌ج‌د'[idx]}.</span> ${o}</li>`).join('')}
+        ${q.options.map((o, idx) => `<li><span class="opt-label">${OPTION_LABELS[idx]}.</span> ${o}</li>`).join('')}
       </ul>
     </div>`;
   const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>${title}</title>
@@ -102,7 +103,7 @@ export function printAnswerKey(title: string, code: string, questions: Question[
   const renderQ = (q: Question, i: number) => `
     <div class="q">
       <span class="num">${i + 1}.</span> ${q.text}
-      <div style="margin-top:4px;font-size:12px">پاسخ صحیح: <b>${'الف‌ب‌ج‌د'[q.correctAnswer]}</b></div>
+      <div style="margin-top:4px;font-size:12px">پاسخ صحیح: <b>${OPTION_LABELS[q.correctAnswer]}</b></div>
       <div class="explanation"><b>پاسخ تشریحی:</b> ${q.explanation}</div>
       ${q.keyNote ? `<div class="keynote"><b>نکته کلیدی:</b> ${q.keyNote}</div>` : ''}
     </div>`;
@@ -138,8 +139,8 @@ export function printReportCard(
     return `<tr>
       <td>${i + 1}</td>
       <td style="color:${s.color};font-weight:700">${s.label}</td>
-      <td>${ans !== undefined ? 'الف‌ب‌ج‌د'[ans] : '—'}</td>
-      <td>${'الف‌ب‌ج‌د'[q.correctAnswer]}</td>
+      <td>${ans !== undefined ? OPTION_LABELS[ans] : '—'}</td>
+      <td>${OPTION_LABELS[q.correctAnswer]}</td>
       <td style="text-align:right;font-size:11px">${q.explanation}</td>
     </tr>`;
   }).join('');

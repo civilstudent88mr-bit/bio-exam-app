@@ -8,6 +8,7 @@ import {
   FolderPlus, Trash2, NotebookPen, BookMarked, Folder, Loader2,
 } from 'lucide-react';
 import type { ExamAttempt, Question } from '@/types';
+import { OPTION_LABELS } from '@/types';
 import { toFaNum, formatTime } from '@/services/scoring';
 import { printReportCard } from '@/services/pdf';
 import {
@@ -215,7 +216,7 @@ export function ResultView({ attempt, questions, onExit }: ResultViewProps) {
                         <div key={oi} className={`flex items-center gap-2 p-2 rounded-lg ${isRightAns ? 'bg-success-100 dark:bg-success-900/30 text-success-700 font-bold' : isUserAns ? 'bg-error-100 dark:bg-error-900/30 text-error-600 font-bold' : 'text-muted'}`}>
                           <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0"
                             style={{ backgroundColor: isRightAns ? 'rgb(34 197 94 / 0.2)' : isUserAns ? 'rgb(239 68 68 / 0.2)' : 'rgb(var(--color-border) / 0.4)' }}>
-                            {'الف‌ب‌ج‌د'[oi]}
+                            {OPTION_LABELS[oi]}
                           </span>
                           {opt}
                           {isRightAns && <CheckCircle2 size={14} className="mr-auto" />}

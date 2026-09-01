@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { Clock, Star, Check, ChevronRight, ChevronLeft, Flag, AlertCircle, X, Loader2 } from 'lucide-react';
 import type { Exam, SelfQuiz, ExamAttempt, Question } from '@/types';
+import { OPTION_LABELS } from '@/types';
 import { createExamResult } from '@/services/api';
 import { gradeAnswers, formatTime, toFaNum } from '@/services/scoring';
 
@@ -180,7 +181,7 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
                       style={{ borderColor: selected === i ? 'rgb(var(--color-primary))' : 'rgb(var(--color-border) / 0.3)' }}
                       onClick={() => selectAnswer(globalIdx, i as 0 | 1 | 2 | 3)}>
                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selected === i ? 'bg-primary-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-muted'}`}>
-                        {selected === i ? <Check size={14} /> : 'الف‌ب‌ج‌د'[i]}
+                        {selected === i ? <Check size={14} /> : OPTION_LABELS[i]}
                       </span>
                       {opt}
                     </button>
