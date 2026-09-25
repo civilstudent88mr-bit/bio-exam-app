@@ -22,5 +22,11 @@ CREATE TABLE IF NOT EXISTS handout_purchases (
 ALTER TABLE handouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE handout_purchases ENABLE ROW LEVEL SECURITY;
 
+-- Private storage bucket for uploaded handouts.
+-- The bucket must exist before the client can upload a file to it.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('handouts', 'handouts', false)
+ON CONFLICT (id) DO NOTHING;
+
 -- Configure these policies through a server-side Edge Function or Supabase Auth.
 -- The app intentionally does not grant anon access to paid files.
