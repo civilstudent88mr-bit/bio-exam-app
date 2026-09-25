@@ -4,11 +4,13 @@ import { TeacherLogin } from './TeacherLogin';
 import { StructureManager } from './StructureManager';
 import { QuestionBank } from './QuestionBank';
 import { ExamManager } from './ExamManager';
+import { HandoutManager } from './HandoutManager';
+import { PaymentManager } from './PaymentManager';
 import { PageContainer, StatCard } from '@/components/Header';
-import { Building2, FileText, ClipboardList, Users, BookOpen, GraduationCap, Layers } from 'lucide-react';
+import { Building2, FileText, ClipboardList, Users, BookOpen, GraduationCap, Layers, FileUp, CreditCard } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-type Tab = 'overview' | 'structure' | 'questions' | 'exams';
+type Tab = 'overview' | 'structure' | 'questions' | 'exams' | 'handouts' | 'payments';
 
 export function TeacherDashboard() {
   const { db, teacherId } = useApp();
@@ -27,6 +29,8 @@ export function TeacherDashboard() {
     { id: 'structure', label: 'مدارس و کلاس‌ها', icon: <Building2 size={18} /> },
     { id: 'questions', label: 'بانک سوالات', icon: <FileText size={18} /> },
     { id: 'exams', label: 'آزمون‌ها', icon: <ClipboardList size={18} /> },
+    { id: 'handouts', label: 'جزوات و قیمت‌گذاری', icon: <FileUp size={18} /> },
+    { id: 'payments', label: 'کارت‌به‌کارت و رسیدها', icon: <CreditCard size={18} /> },
   ];
 
   return (
@@ -85,6 +89,8 @@ export function TeacherDashboard() {
       {tab === 'structure' && <StructureManager />}
       {tab === 'questions' && <QuestionBank />}
       {tab === 'exams' && <ExamManager />}
+      {tab === 'handouts' && <HandoutManager />}
+      {tab === 'payments' && <PaymentManager />}
     </PageContainer>
   );
 }

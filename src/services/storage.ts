@@ -19,6 +19,10 @@ export function createEmptyDb(): Database {
     vaultFolders: [],
     notes: [],
     transactions: [],
+    handouts: [],
+    handoutPurchases: [],
+    paymentSettings: null,
+    cardTransfers: [],
   };
 }
 

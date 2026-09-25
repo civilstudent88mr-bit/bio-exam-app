@@ -133,7 +133,7 @@ export interface Note {
 }
 
 // --- Wallet transactions ---
-export type TxType = 'charge' | 'exam';
+export type TxType = 'charge' | 'exam' | 'handout';
 
 export interface Transaction {
   id: ID;
@@ -142,6 +142,48 @@ export interface Transaction {
   type: TxType;
   description: string;
   createdAt: ISODate;
+}
+
+export interface Handout {
+  id: ID;
+  title: string;
+  description: string;
+  price: number;
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  teacherId: ID;
+  createdAt: ISODate;
+}
+
+export interface HandoutPurchase {
+  id: ID;
+  handoutId: ID;
+  studentId: ID;
+  amount: number;
+  createdAt: ISODate;
+}
+
+export interface PaymentSettings {
+  id: number;
+  cardNumber: string;
+  cardHolder: string;
+  updatedAt: ISODate;
+}
+
+export type CardTransferStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CardTransfer {
+  id: ID;
+  studentId: ID;
+  amount: number;
+  trackingCode: string;
+  receiptPath: string;
+  receiptFileName: string;
+  status: CardTransferStatus;
+  adminNote: string;
+  createdAt: ISODate;
+  reviewedAt: ISODate | null;
 }
 
 // --- Root database shape ---
@@ -158,6 +200,10 @@ export interface Database {
   vaultFolders: VaultFolder[];
   notes: Note[];
   transactions: Transaction[];
+  handouts: Handout[];
+  handoutPurchases: HandoutPurchase[];
+  paymentSettings: PaymentSettings | null;
+  cardTransfers: CardTransfer[];
 }
 
 // --- UI prefs (stored separately) ---

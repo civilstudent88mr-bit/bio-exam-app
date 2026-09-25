@@ -11,11 +11,11 @@ import { PageContainer, StatCard } from '@/components/Header';
 import { Badge, EmptyState } from '@/components/ui/Form';
 import {
   ClipboardList, Clock, Gift, DollarSign, Lock, Play, CheckCircle2,
-  Wallet, Wand2, BookOpen, GraduationCap, Calendar,
+  Wallet, Wand2, BookOpen, GraduationCap, Calendar, Download, FileText,
 } from 'lucide-react';
-import type { Exam, SelfQuiz, ExamAttempt, Question } from '@/types';
+import type { Exam, SelfQuiz, ExamAttempt, Question, Handout } from '@/types';
 import { toFaNum, formatDate } from '@/services/scoring';
-import { updateStudentWallet, createTransaction } from '@/services/api';
+import { updateStudentWallet, createTransaction, createHandoutPurchase, getHandoutDownloadUrl } from '@/services/api';
 
 type View = 'dashboard' | 'exam' | 'result';
 type ExamSource = { exam?: Exam; quiz?: SelfQuiz };
@@ -27,6 +27,8 @@ export function StudentDashboard() {
   const [examSource, setExamSource] = useState<ExamSource>({});
   const [result, setResult] = useState<{ attempt: ExamAttempt; questions: Question[] } | null>(null);
   const [showPaymentConfirm, setShowPaymentConfirm] = useState<Exam | null>(null);
+  const [showHandoutPayment, setShowHandoutPayment] = useState<Handout | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   if (!studentId) return <StudentLogin />;
 
@@ -111,6 +113,29 @@ export function StudentDashboard() {
     setView('exam');
   };
 
+  const downloadHandout = async (handout: Handout) => {
+    const purchased = handout.price === 0 || db.handoutPurchases.some(p => p.handoutId === handout.id && p.studentId === student.id);
+    if (!purchased) { setShowHandoutPayment(handout); return; }
+    setDownloadingId(handout.id);
+    try {
+      const url = await getHandoutDownloadUrl(handout.filePath);
+      const link = document.createElement('a'); link.href = url; link.download = handout.fileName; link.target = '_blank'; link.click();
+    } catch (error: unknown) { notify(error instanceof Error ? error.message : 'خطا در دریافت فایل', 'error'); }
+    finally { setDownloadingId(null); }
+  };
+
+  const confirmHandoutPayment = async () => {
+    if (!showHandoutPayment) return;
+    const handout = showHandoutPayment;
+    if (student.walletBalance < handout.price) { notify('موجودی کیف پول کافی نیست', 'error'); return; }
+    try {
+      await createTransaction({ studentId: student.id, amount: handout.price, type: 'handout', description: `خرید جزوه: ${handout.title}` });
+      await updateStudentWallet(student.id, student.walletBalance - handout.price);
+      await createHandoutPurchase({ handoutId: handout.id, studentId: student.id, amount: handout.price });
+      await reloadDb(); setShowHandoutPayment(null); notify('پرداخت موفق بود؛ دانلود جزوه فعال شد', 'success');
+    } catch (error: unknown) { notify(error instanceof Error ? error.message : 'خطا در پرداخت جزوه', 'error'); }
+  };
+
   return (
     <PageContainer>
       <div className="mb-6">
@@ -169,6 +194,14 @@ export function StudentDashboard() {
             )}
           </div>
 
+          <div>
+            <h3 className="font-bold mb-3 flex items-center gap-2"><FileText size={20} className="text-primary-500" /> جزوات آموزشی</h3>
+            {db.handouts.length === 0 ? <div className="card"><EmptyState icon={<FileText size={32} />} title="جزوه‌ای منتشر نشده" message="به‌زودی جزوات دبیران در این بخش قرار می‌گیرد." /></div> : <div className="grid md:grid-cols-2 gap-3">{db.handouts.map(handout => {
+              const purchased = handout.price === 0 || db.handoutPurchases.some(p => p.handoutId === handout.id && p.studentId === student.id);
+              return <div key={handout.id} className="card flex flex-col justify-between gap-3"><div><div className="flex items-start justify-between gap-2"><h4 className="font-bold">{handout.title}</h4><Badge color={handout.price === 0 ? 'success' : 'warning'}>{handout.price === 0 ? 'رایگان' : `${toFaNum(handout.price.toLocaleString('fa-IR'))} تومان`}</Badge></div>{handout.description && <p className="text-sm text-muted mt-2">{handout.description}</p>}<p className="text-xs text-muted mt-2">{handout.fileName}</p></div><button className={`btn w-full ${purchased ? 'btn-primary' : 'btn-outline'}`} onClick={() => downloadHandout(handout)} disabled={downloadingId === handout.id}>{downloadingId === handout.id ? 'در حال آماده‌سازی...' : purchased ? <><Download size={16} /> دانلود جزوه</> : <><DollarSign size={16} /> خرید و دانلود</>}</button></div>;
+            })}</div>}
+          </div>
+
           {/* Completed exams */}
           {myAttempts.length > 0 && (
             <div>
@@ -225,6 +258,14 @@ export function StudentDashboard() {
         title="پرداخت هزینه آزمون"
         message={showPaymentConfirm ? `مبلغ ${toFaNum(showPaymentConfirm.cost.toLocaleString('fa-IR'))} تومان از کیف پول شما کسر می‌شود. موجودی فعلی: ${toFaNum(student.walletBalance.toLocaleString('fa-IR'))} تومان` : ''}
         confirmText="پرداخت و ورود"
+      />
+      <ConfirmModal
+        open={!!showHandoutPayment}
+        onClose={() => setShowHandoutPayment(null)}
+        onConfirm={confirmHandoutPayment}
+        title="پرداخت هزینه جزوه"
+        message={showHandoutPayment ? `مبلغ ${toFaNum(showHandoutPayment.price.toLocaleString('fa-IR'))} تومان از کیف پول شما کسر می‌شود. موجودی فعلی: ${toFaNum(student.walletBalance.toLocaleString('fa-IR'))} تومان` : ''}
+        confirmText="پرداخت و فعال‌سازی دانلود"
       />
     </PageContainer>
   );

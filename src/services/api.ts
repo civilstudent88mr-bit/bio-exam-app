@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import type {
   School, ClassGroup, Teacher, Student, Question, Exam, ExamAttempt,
-  SelfQuiz, VaultFolder, Note, Transaction, Database,
+  SelfQuiz, VaultFolder, Note, Transaction, Database, Handout, HandoutPurchase,
+  PaymentSettings, CardTransfer,
 } from '@/types';
 import { genExamCode, loadDb } from './storage';
 
@@ -110,6 +111,29 @@ function mapTransaction(row: any): Transaction {
     type: row.type, description: row.description, createdAt: row.created_at,
   };
 }
+function mapHandout(row: any): Handout {
+  return {
+    id: row.id, title: row.title, description: row.description || '', price: row.price,
+    filePath: row.file_path, fileName: row.file_name, fileSize: row.file_size || 0,
+    teacherId: row.teacher_id, createdAt: row.created_at,
+  };
+}
+function mapHandoutPurchase(row: any): HandoutPurchase {
+  return {
+    id: row.id, handoutId: row.handout_id, studentId: row.student_id,
+    amount: row.amount, createdAt: row.created_at,
+  };
+}
+function mapPaymentSettings(row: any): PaymentSettings {
+  return { id: row.id, cardNumber: row.card_number || '', cardHolder: row.card_holder || '', updatedAt: row.updated_at };
+}
+function mapCardTransfer(row: any): CardTransfer {
+  return {
+    id: row.id, studentId: row.student_id, amount: row.amount, trackingCode: row.tracking_code,
+    receiptPath: row.receipt_path, receiptFileName: row.receipt_file_name, status: row.status,
+    adminNote: row.admin_note || '', createdAt: row.created_at, reviewedAt: row.reviewed_at,
+  };
+}
 
 // ============================================================
 // Load entire database (for initial context hydration)
@@ -117,7 +141,7 @@ function mapTransaction(row: any): Transaction {
 
 export async function loadDatabase(): Promise<Database> {
   await migrateLocalStorageIfNeeded();
-  const [schools, classes, teachers, students, questions, exams, attempts, selfQuizzes, vaultFolders, notes, transactions] = await Promise.all([
+  const [schools, classes, teachers, students, questions, exams, attempts, selfQuizzes, vaultFolders, notes, transactions, handouts, handoutPurchases, paymentSettings, cardTransfers] = await Promise.all([
     supabase.from('schools').select('*').then(r => r.data || []),
     supabase.from('classes').select('*').then(r => r.data || []),
     supabase.from('teachers').select('*').then(r => r.data || []),
@@ -129,6 +153,10 @@ export async function loadDatabase(): Promise<Database> {
     supabase.from('vault_folders').select('*').then(r => r.data || []),
     supabase.from('notes').select('*').then(r => r.data || []),
     supabase.from('transactions').select('*').then(r => r.data || []),
+    supabase.from('handouts').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
+    supabase.from('handout_purchases').select('*').then(r => r.data || []),
+    supabase.from('payment_settings').select('*').eq('id', 1).maybeSingle().then(r => r.data),
+    supabase.from('card_transfers').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
   ]);
 
   return {
@@ -144,6 +172,10 @@ export async function loadDatabase(): Promise<Database> {
     vaultFolders: vaultFolders.map(mapVaultFolder),
     notes: notes.map(mapNote),
     transactions: transactions.map(mapTransaction),
+    handouts: handouts.map(mapHandout),
+    handoutPurchases: handoutPurchases.map(mapHandoutPurchase),
+    paymentSettings: paymentSettings ? mapPaymentSettings(paymentSettings) : null,
+    cardTransfers: cardTransfers.map(mapCardTransfer),
   };
 }
 
@@ -449,4 +481,62 @@ export async function createTransaction(tx: Omit<Transaction, 'id' | 'createdAt'
   }).select().single();
   if (error) throw error;
   return mapTransaction(data);
+}
+
+export async function createHandout(handout: Omit<Handout, 'id' | 'createdAt'>): Promise<Handout> {
+  const { data, error } = await supabase.from('handouts').insert({
+    title: handout.title, description: handout.description, price: handout.price,
+    file_path: handout.filePath, file_name: handout.fileName, file_size: handout.fileSize,
+    teacher_id: handout.teacherId,
+  }).select().single();
+  if (error) throw error;
+  return mapHandout(data);
+}
+
+export async function deleteHandout(id: string, filePath: string): Promise<void> {
+  const { error } = await supabase.from('handouts').delete().eq('id', id);
+  if (error) throw error;
+  await supabase.storage.from('handouts').remove([filePath]);
+}
+
+export async function createHandoutPurchase(purchase: Omit<HandoutPurchase, 'id' | 'createdAt'>): Promise<HandoutPurchase> {
+  const { data, error } = await supabase.from('handout_purchases').insert({
+    handout_id: purchase.handoutId, student_id: purchase.studentId, amount: purchase.amount,
+  }).select().single();
+  if (error) throw error;
+  return mapHandoutPurchase(data);
+}
+
+export async function getHandoutDownloadUrl(filePath: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('handouts').createSignedUrl(filePath, 60 * 10);
+  if (error || !data?.signedUrl) throw error || new Error('لینک دانلود جزوه ایجاد نشد');
+  return data.signedUrl;
+}
+
+export async function upsertPaymentSettings(settings: Omit<PaymentSettings, 'updatedAt'>): Promise<PaymentSettings> {
+  const { data, error } = await supabase.from('payment_settings').upsert({
+    id: 1, card_number: settings.cardNumber, card_holder: settings.cardHolder,
+  }).select().single();
+  if (error) throw error;
+  return mapPaymentSettings(data);
+}
+
+export async function createCardTransfer(transfer: Omit<CardTransfer, 'id' | 'createdAt' | 'status' | 'reviewedAt' | 'adminNote'>): Promise<CardTransfer> {
+  const { data, error } = await supabase.from('card_transfers').insert({
+    student_id: transfer.studentId, amount: transfer.amount, tracking_code: transfer.trackingCode,
+    receipt_path: transfer.receiptPath, receipt_file_name: transfer.receiptFileName,
+  }).select().single();
+  if (error) throw error;
+  return mapCardTransfer(data);
+}
+
+export async function updateCardTransferStatus(id: string, status: CardTransfer['status'], adminNote = ''): Promise<void> {
+  const { error } = await supabase.from('card_transfers').update({ status, admin_note: adminNote, reviewed_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function getReceiptDownloadUrl(receiptPath: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('payment-receipts').createSignedUrl(receiptPath, 60 * 10);
+  if (error || !data?.signedUrl) throw error || new Error('لینک رسید ایجاد نشد');
+  return data.signedUrl;
 }
