@@ -514,9 +514,18 @@ export async function getHandoutDownloadUrl(filePath: string): Promise<string> {
 }
 
 export async function upsertPaymentSettings(settings: Omit<PaymentSettings, 'updatedAt'>): Promise<PaymentSettings> {
-  const { data, error } = await supabase.from('payment_settings').upsert({
-    id: 1, card_number: settings.cardNumber, card_holder: settings.cardHolder,
-  }).select().single();
+  const cardNumber = settings.cardNumber.replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+  const payload = { id: 1, card_number: cardNumber, card_holder: settings.cardHolder.trim() };
+  const { data: updated, error: updateError } = await supabase
+    .from('payment_settings')
+    .update(payload)
+    .eq('id', 1)
+    .select()
+    .maybeSingle();
+  if (updateError) throw updateError;
+  if (updated) return mapPaymentSettings(updated);
+
+  const { data, error } = await supabase.from('payment_settings').insert(payload).select().single();
   if (error) throw error;
   return mapPaymentSettings(data);
 }
