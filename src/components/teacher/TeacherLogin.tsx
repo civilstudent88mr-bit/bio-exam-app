@@ -5,7 +5,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Form';
 import { BookOpen, LogIn, Loader2, KeyRound, Phone } from 'lucide-react';
 import { createTeacher, loginTeacher, resetTeacherPassword } from '@/services/api';
-import { normalizeName, validatePassword, isLocked, getLockoutRemaining, recordFailedAttempt, clearLockout } from '@/services/auth';
+import { normalizeName, validatePassword, isLocked, getLockoutRemaining, recordFailedAttempt, clearLockout, establishAuthSession } from '@/services/auth';
+import { linkTeacherAuth } from '@/services/api';
 
 export function TeacherLogin() {
   const { setTeacherId } = useApp();
@@ -51,6 +52,8 @@ export function TeacherLogin() {
     try {
       if (mode === 'register') {
         const teacher = await createTeacher(normName, password, phone.trim());
+        const authUserId = await establishAuthSession('teacher', normName, password);
+        await linkTeacherAuth(teacher.id, authUserId);
         clearLockout(ROLE);
         setTeacherId(teacher.id);
         notify('ثبت‌نام موفق', 'success');
@@ -66,6 +69,8 @@ export function TeacherLogin() {
           }
           return;
         }
+        const authUserId = await establishAuthSession('teacher', normName, password);
+        if (teacher.authUserId !== authUserId) await linkTeacherAuth(teacher.id, authUserId);
         clearLockout(ROLE);
         setTeacherId(teacher.id);
         notify('ورود موفق', 'success');

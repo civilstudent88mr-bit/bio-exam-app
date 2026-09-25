@@ -30,6 +30,7 @@ export interface Teacher {
   password: string;
   phone: string;
   createdAt: ISODate;
+  authUserId?: ID | null;
 }
 
 export interface Student {
@@ -41,6 +42,7 @@ export interface Student {
   phone: string;
   walletBalance: number;
   createdAt: ISODate;
+  authUserId?: ID | null;
 }
 
 // --- Question bank ---

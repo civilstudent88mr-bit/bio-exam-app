@@ -50,12 +50,12 @@ function mapClass(row: any): ClassGroup {
   return { id: row.id, schoolId: row.school_id, name: row.name, createdAt: row.created_at };
 }
 function mapTeacher(row: any): Teacher {
-  return { id: row.id, name: row.name, password: row.password, phone: row.phone || '', createdAt: row.created_at };
+  return { id: row.id, name: row.name, password: row.password, phone: row.phone || '', createdAt: row.created_at, authUserId: row.auth_user_id || null };
 }
 function mapStudent(row: any): Student {
   return {
     id: row.id, name: row.name, schoolId: row.school_id, classId: row.class_id,
-    password: row.password, phone: row.phone || '', walletBalance: row.wallet_balance, createdAt: row.created_at,
+    password: row.password, phone: row.phone || '', walletBalance: row.wallet_balance, createdAt: row.created_at, authUserId: row.auth_user_id || null,
   };
 }
 function mapQuestion(row: any): Question {
@@ -265,6 +265,16 @@ export async function resetStudentPassword(name: string, phone: string, newPassw
 
 export async function updateStudentWallet(studentId: string, newBalance: number): Promise<void> {
   const { error } = await supabase.from('students').update({ wallet_balance: newBalance }).eq('id', studentId);
+  if (error) throw error;
+}
+
+export async function linkTeacherAuth(teacherId: string, authUserId: string): Promise<void> {
+  const { error } = await supabase.from('teachers').update({ auth_user_id: authUserId }).eq('id', teacherId);
+  if (error) throw error;
+}
+
+export async function linkStudentAuth(studentId: string, authUserId: string): Promise<void> {
+  const { error } = await supabase.from('students').update({ auth_user_id: authUserId }).eq('id', studentId);
   if (error) throw error;
 }
 

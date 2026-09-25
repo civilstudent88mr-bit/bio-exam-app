@@ -5,7 +5,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Field, Select } from '@/components/ui/Form';
 import { GraduationCap, LogIn, Loader2, KeyRound, Phone } from 'lucide-react';
 import { createStudent, loginStudent, resetStudentPassword } from '@/services/api';
-import { normalizeName, validatePassword, isLocked, getLockoutRemaining, recordFailedAttempt, clearLockout } from '@/services/auth';
+import { normalizeName, validatePassword, isLocked, getLockoutRemaining, recordFailedAttempt, clearLockout, establishAuthSession } from '@/services/auth';
+import { linkStudentAuth } from '@/services/api';
 
 export function StudentLogin() {
   const { db, setStudentId, reloadDb } = useApp();
@@ -55,6 +56,8 @@ export function StudentLogin() {
       if (mode === 'register') {
         if (!schoolId || !classId) { notify('مدرسه و کلاس را انتخاب کنید', 'warning'); return; }
         const student = await createStudent(normName, schoolId, classId, password, phone.trim());
+        const authUserId = await establishAuthSession('student', normName, password);
+        await linkStudentAuth(student.id, authUserId);
         await reloadDb();
         clearLockout(ROLE);
         setStudentId(student.id);
@@ -71,6 +74,8 @@ export function StudentLogin() {
           }
           return;
         }
+        const authUserId = await establishAuthSession('student', normName, password);
+        if (student.authUserId !== authUserId) await linkStudentAuth(student.id, authUserId);
         clearLockout(ROLE);
         setStudentId(student.id);
         notify('ورود موفق', 'success');
