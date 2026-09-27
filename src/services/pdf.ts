@@ -1,109 +1,123 @@
 import type { Question, ExamAttempt } from '@/types';
 import { OPTION_LABELS } from '@/types';
 
-function toFaNum(n: number | string): string {
-  return String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
+// Lightweight PDF generator — produces a printable HTML document and
+// triggers the browser print dialog (user can "Save as PDF").
+// This avoids heavy dependencies while delivering standard print output.
+
+function printWindow(html: string): void {
+  const w = window.open('', '_blank');
+  if (!w) {
+    alert('لطفاً اجازه باز شدن پنجره جدید را بدهید');
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => {
+    setTimeout(() => {
+      w.print();
+    }, 300);
+  };
 }
 
-function formatTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function openPrintWindow(html: string): void {
-  const win = window.open('', '_blank', 'noopener,noreferrer');
-  if (!win) return;
-  win.document.write(`<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>چاپ</title>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-      * { font-family: 'Vazirmatn', sans-serif; box-sizing: border-box; }
-      body { padding: 24px; color: #1e293b; line-height: 1.7; }
-      h1 { font-size: 20px; margin: 0 0 4px; }
-      h2 { font-size: 16px; margin: 20px 0 10px; }
-      .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 20px; }
-      .meta { font-size: 13px; color: #64748b; margin-bottom: 4px; }
-      .q { margin-bottom: 16px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }
-      .q-num { font-weight: bold; }
-      .opt { margin: 4px 0 4px 20px; font-size: 14px; }
-      .answer-key { background: #f0fdfa; border-color: #5eead4; }
-      .correct { color: #16a34a; font-weight: bold; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-      th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: center; font-size: 13px; }
-      th { background: #f8fafc; }
-      .sheet { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
-      .cell { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; text-align: center; }
-      .cell .n { font-weight: bold; font-size: 12px; }
-      .cell .circles { display: flex; gap: 6px; justify-content: center; margin-top: 6px; }
-      .circle { width: 18px; height: 18px; border: 1.5px solid #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; }
-      .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
-      .summary .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
-      .summary .val { font-size: 24px; font-weight: bold; }
-      .summary .lbl { font-size: 12px; color: #64748b; }
-      @media print { body { padding: 12px; } }
-    </style></head><body>${html}</body></html>`);
-  win.document.close();
-  setTimeout(() => { win.print(); }, 600);
-}
+const baseStyle = `
+  <style>
+    @page { margin: 1.5cm; }
+    * { font-family: 'Vazirmatn', Tahoma, sans-serif; box-sizing: border-box; }
+    body { direction: rtl; color: #1e293b; line-height: 1.8; font-size: 13px; }
+    .header { text-align: center; border-bottom: 3px double #0d9488; padding-bottom: 12px; margin-bottom: 20px; }
+    .header h1 { font-size: 20px; color: #0f766e; margin: 0 0 4px; }
+    .header .meta { font-size: 12px; color: #64748b; }
+    .exam-code { text-align: center; margin: 12px 0; font-size: 13px; }
+    .exam-code span { border: 1px solid #94a3b8; padding: 4px 16px; border-radius: 6px; letter-spacing: 2px; font-family: monospace; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .q { margin-bottom: 16px; break-inside: avoid; }
+    .q .num { font-weight: 700; color: #0f766e; }
+    .opts { list-style: none; padding: 0; margin: 8px 0 0; }
+    .opts li { padding: 2px 0; }
+    .opt-label { font-weight: 700; margin-left: 6px; }
+    .footer { margin-top: 30px; border-top: 1px solid #cbd5e1; padding-top: 10px; text-align: center; font-size: 11px; color: #94a3b8; }
+    .answer-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin: 20px 0; }
+    .answer-cell { border: 1px solid #94a3b8; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+    .answer-cell .q-num { font-size: 10px; color: #64748b; }
+    .explanation { background: #f0fdfa; border-right: 3px solid #14b8a6; padding: 8px 12px; margin-top: 6px; border-radius: 4px; font-size: 12px; }
+    .keynote { background: #fffbeb; border-right: 3px solid #f59e0b; padding: 6px 12px; margin-top: 4px; border-radius: 4px; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: center; font-size: 12px; }
+    th { background: #f0fdfa; color: #0f766e; }
+    .stat-box { display: inline-block; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 20px; margin: 4px; text-align: center; }
+    .stat-box .val { font-size: 22px; font-weight: 700; color: #0f766e; }
+    .stat-box .lbl { font-size: 11px; color: #64748b; }
+  </style>
+`;
 
 export function printExamPaper(title: string, code: string, questions: Question[]): void {
-  let html = `<div class="header"><h1>${title}</h1><div class="meta">کد آزمون: ${code} • تعداد سوالات: ${toFaNum(questions.length)}</div></div>`;
-  questions.forEach((q, i) => {
-    html += `<div class="q"><span class="q-num">${toFaNum(i + 1)}.</span> ${q.text}`;
-    q.options.forEach((opt, oi) => {
-      html += `<div class="opt">${OPTION_LABELS[oi]}) ${opt}</div>`;
-    });
-    html += `</div>`;
-  });
-  openPrintWindow(html);
+  const half = Math.ceil(questions.length / 2);
+  const col1 = questions.slice(0, half);
+  const col2 = questions.slice(half);
+  const renderQ = (q: Question, i: number) => `
+    <div class="q">
+      <span class="num">${i + 1}.</span> ${q.text}
+      <ul class="opts">
+        ${q.options.map((o, idx) => `<li><span class="opt-label">${OPTION_LABELS[idx]}.</span> ${o}</li>`).join('')}
+      </ul>
+    </div>`;
+  const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    ${baseStyle}</head><body>
+    <div class="header">
+      <h1>${title}</h1>
+      <div class="meta">آزمون زیست‌شناسی — سامانه آزمون‌ساز</div>
+    </div>
+    <div class="exam-code">کد آزمون: <span>${code}</span></div>
+    <div class="cols">
+      <div>${col1.map((q, i) => renderQ(q, i)).join('')}</div>
+      <div>${col2.map((q, i) => renderQ(q, half + i)).join('')}</div>
+    </div>
+    <div class="footer">تولید شده توسط سامانه آزمون‌ساز زیست‌شناسی</div>
+    </body></html>`;
+  printWindow(html);
 }
 
 export function printAnswerSheet(title: string, code: string, count: number): void {
-  let html = `<div class="header"><h1>${title}</h1><div class="meta">کد آزمون: ${code} • پاسخ‌برگ</div></div>`;
-  html += `<div class="sheet">`;
-  for (let i = 0; i < count; i++) {
-    html += `<div class="cell"><div class="n">${toFaNum(i + 1)}</div><div class="circles">`;
-    for (let j = 0; j < 4; j++) {
-      html += `<div class="circle">${OPTION_LABELS[j]}</div>`;
-    }
-    html += `</div></div>`;
-  }
-  html += `</div>`;
-  openPrintWindow(html);
+  const cells = Array.from({ length: count }, (_, i) => `
+    <div class="answer-cell">
+      <div class="q-num">${i + 1}</div>
+    </div>`).join('');
+  const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>پاسخ‌برگ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    ${baseStyle}</head><body>
+    <div class="header">
+      <h1>پاسخ‌برگ</h1>
+      <div class="meta">${title} — کد: ${code}</div>
+    </div>
+    <p style="font-size:12px;color:#64748b">نام و نام خانوادگی: ____________________</p>
+    <div class="answer-grid">${cells}</div>
+    <div class="footer">سامانه آزمون‌ساز زیست‌شناسی</div>
+    </body></html>`;
+  printWindow(html);
 }
 
 export function printAnswerKey(title: string, code: string, questions: Question[]): void {
-  let html = `<div class="header"><h1>${title}</h1><div class="meta">کد آزمون: ${code} • پاسخ‌نامه کلیدی</div></div>`;
-  questions.forEach((q, i) => {
-    html += `<div class="q answer-key"><span class="q-num">${toFaNum(i + 1)}.</span> ${q.text}`;
-    q.options.forEach((opt, oi) => {
-      const isCorrect = oi === q.correctAnswer;
-      html += `<div class="opt ${isCorrect ? 'correct' : ''}">${OPTION_LABELS[oi]}) ${opt}${isCorrect ? ' ✓' : ''}</div>`;
-    });
-    if (q.explanation) html += `<div style="margin-top:6px;font-size:13px;color:#334155;"><b>پاسخ تشریحی:</b> ${q.explanation}</div>`;
-    html += `</div>`;
-  });
-  openPrintWindow(html);
-}
-
-interface ResultRow {
-  name: string;
-  percentage: number;
-  correct: number;
-  wrong: number;
-  blank: number;
-  timeSpentSec: number;
-  paid: boolean;
-}
-
-export function printExamResults(title: string, code: string, rows: ResultRow[]): void {
-  let html = `<div class="header"><h1>${title}</h1><div class="meta">کد آزمون: ${code} • گزارش نتایج</div></div>`;
-  html += `<table><thead><tr><th>ردیف</th><th>نام</th><th>درصد</th><th>درست</th><th>غلط</th><th>نزده</th><th>زمان</th></tr></thead><tbody>`;
-  rows.forEach((r, i) => {
-    html += `<tr><td>${toFaNum(i + 1)}</td><td style="text-align:right">${r.name}</td><td>${toFaNum(r.percentage)}٪</td><td>${toFaNum(r.correct)}</td><td>${toFaNum(r.wrong)}</td><td>${toFaNum(r.blank)}</td><td>${Math.floor(r.timeSpentSec / 60)} دقیقه</td></tr>`;
-  });
-  html += `</tbody></table>`;
-  openPrintWindow(html);
+  const renderQ = (q: Question, i: number) => `
+    <div class="q">
+      <span class="num">${i + 1}.</span> ${q.text}
+      <div style="margin-top:4px;font-size:12px">پاسخ صحیح: <b>${OPTION_LABELS[q.correctAnswer]}</b></div>
+      <div class="explanation"><b>پاسخ تشریحی:</b> ${q.explanation}</div>
+      ${q.keyNote ? `<div class="keynote"><b>نکته کلیدی:</b> ${q.keyNote}</div>` : ''}
+    </div>`;
+  const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>پاسخ‌نامه تشریحی</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    ${baseStyle}</head><body>
+    <div class="header">
+      <h1>پاسخ‌نامه تشریحی</h1>
+      <div class="meta">${title} — کد: ${code}</div>
+    </div>
+    ${questions.map((q, i) => renderQ(q, i)).join('')}
+    <div class="footer">سامانه آزمون‌ساز زیست‌شناسی</div>
+    </body></html>`;
+  printWindow(html);
 }
 
 export function printReportCard(
@@ -111,36 +125,75 @@ export function printReportCard(
   code: string,
   attempt: ExamAttempt,
   questions: Question[],
-  studentName: string,
+  studentName: string
 ): void {
-  const faDate = new Date(attempt.submittedAt || attempt.startedAt).toLocaleString('fa-IR');
-  let html = `<div class="header"><h1>کارنامه: ${title}</h1><div class="meta">کد: ${code} • ${studentName} • ${faDate}</div></div>`;
-  html += `<div class="summary">`;
-  html += `<div class="box"><div class="val" style="color:#0d9488">${toFaNum(attempt.percentage)}٪</div><div class="lbl">درصد کنکوری</div></div>`;
-  html += `<div class="box"><div class="val" style="color:#16a34a">${toFaNum(attempt.correct)}</div><div class="lbl">درست</div></div>`;
-  html += `<div class="box"><div class="val" style="color:#ef4444">${toFaNum(attempt.wrong)}</div><div class="lbl">غلط</div></div>`;
-  html += `<div class="box"><div class="val" style="color:#64748b">${toFaNum(attempt.blank)}</div><div class="lbl">نزده</div></div>`;
-  html += `</div>`;
-  html += `<div class="meta">زمان صرف‌شده: ${formatTime(attempt.timeSpentSec)}</div>`;
-  html += `<h2>پاسخ‌نامه</h2>`;
-  questions.forEach((q, i) => {
+  const status = (i: number) => {
     const ans = attempt.answers[i];
-    const isCorrect = ans === q.correctAnswer;
-    const isBlank = ans === undefined;
-    const statusLabel = isBlank ? 'نزده' : isCorrect ? 'درست' : 'غلط';
-    const statusColor = isBlank ? '#64748b' : isCorrect ? '#16a34a' : '#ef4444';
-    html += `<div class="q ${isCorrect ? 'answer-key' : ''}">`;
-    html += `<span class="q-num">${toFaNum(i + 1)}.</span> <span style="color:${statusColor};font-weight:bold;font-size:12px">[${statusLabel}]</span> ${q.text}`;
-    q.options.forEach((opt, oi) => {
-      const isRight = oi === q.correctAnswer;
-      const isUser = ans === oi;
-      let cls = 'opt';
-      if (isRight) cls += ' correct';
-      else if (isUser) cls += ' style="color:#ef4444;font-weight:bold"';
-      html += `<div class="${cls}">${OPTION_LABELS[oi]}) ${opt}${isRight ? ' ✓' : isUser ? ' ✗' : ''}</div>`;
-    });
-    if (q.explanation) html += `<div style="margin-top:6px;font-size:13px;color:#334155;"><b>پاسخ تشریحی:</b> ${q.explanation}</div>`;
-    html += `</div>`;
-  });
-  openPrintWindow(html);
+    if (ans === undefined) return { label: 'نزده', color: '#94a3b8' };
+    if (ans === questions[i].correctAnswer) return { label: 'درست', color: '#16a34a' };
+    return { label: 'غلط', color: '#dc2626' };
+  };
+  const rows = questions.map((q, i) => {
+    const s = status(i);
+    const ans = attempt.answers[i];
+    return `<tr>
+      <td>${i + 1}</td>
+      <td style="color:${s.color};font-weight:700">${s.label}</td>
+      <td>${ans !== undefined ? OPTION_LABELS[ans] : '—'}</td>
+      <td>${OPTION_LABELS[q.correctAnswer]}</td>
+      <td style="text-align:right;font-size:11px">${q.explanation}</td>
+    </tr>`;
+  }).join('');
+  const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>کارنامه</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    ${baseStyle}</head><body>
+    <div class="header">
+      <h1>کارنامه آزمون</h1>
+      <div class="meta">${title} — کد: ${code}</div>
+    </div>
+    <p style="font-size:13px">دانش‌آموز: <b>${studentName}</b></p>
+    <div style="text-align:center;margin:16px 0">
+      <div class="stat-box"><div class="val">${attempt.percentage}٪</div><div class="lbl">درصد کنکوری</div></div>
+      <div class="stat-box"><div class="val">${attempt.correct}</div><div class="lbl">درست</div></div>
+      <div class="stat-box"><div class="val">${attempt.wrong}</div><div class="lbl">غلط</div></div>
+      <div class="stat-box"><div class="val">${attempt.blank}</div><div class="lbl">نزده</div></div>
+    </div>
+    <table>
+      <tr><th>سوال</th><th>وضعیت</th><th>پاسخ شما</th><th>پاسخ صحیح</th><th>توضیح</th></tr>
+      ${rows}
+    </table>
+    <div class="footer">سامانه آزمون‌ساز زیست‌شناسی</div>
+    </body></html>`;
+  printWindow(html);
+}
+
+export function printExamResults(
+  title: string,
+  code: string,
+  rows: { name: string; percentage: number; correct: number; wrong: number; blank: number; timeSpentSec: number; paid: boolean }[]
+): void {
+  const trows = rows.map((r, i) => `<tr>
+    <td>${i + 1}</td>
+    <td>${r.name}</td>
+    <td style="font-weight:700;color:#0f766e">${r.percentage}٪</td>
+    <td>${r.correct}</td>
+    <td>${r.wrong}</td>
+    <td>${r.blank}</td>
+    <td>${Math.floor(r.timeSpentSec / 60)} دقیقه</td>
+    <td style="color:${r.paid ? '#16a34a' : '#dc2626'}">${r.paid ? 'پرداخت شده' : 'پرداخت نشده'}</td>
+  </tr>`).join('');
+  const html = `<!DOCTYPE html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><title>گزارش آزمون</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    ${baseStyle}</head><body>
+    <div class="header">
+      <h1>گزارش آزمون</h1>
+      <div class="meta">${title} — کد: ${code}</div>
+    </div>
+    <table>
+      <tr><th>ردیف</th><th>نام</th><th>درصد</th><th>درست</th><th>غلط</th><th>نزده</th><th>زمان</th><th>پرداخت</th></tr>
+      ${trows}
+    </table>
+    <div class="footer">سامانه آزمون‌ساز زیست‌شناسی</div>
+    </body></html>`;
+  printWindow(html);
 }
