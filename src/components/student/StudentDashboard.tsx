@@ -5,6 +5,8 @@ import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { StudentLogin } from './StudentLogin';
 import { WalletCard } from './WalletCard';
 import { SelfQuizMaker } from './SelfQuizMaker';
+import { AssessmentBinder } from './AssessmentBinder';
+import { StudentQuestionBank } from './StudentQuestionBank';
 import { ExamEnvironment } from './ExamEnvironment';
 import { ResultView } from './ResultView';
 import { PageContainer, StatCard } from '@/components/Header';
@@ -239,6 +241,8 @@ export function StudentDashboard() {
           )}
 
           {/* Self quiz maker */}
+          <AssessmentBinder onStart={startQuiz} />
+          <StudentQuestionBank />
           <div>
             <SelfQuizMaker onStart={startQuiz} />
           </div>

@@ -5,7 +5,7 @@ import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { Clock, Star, Check, ChevronRight, ChevronLeft, Flag, AlertCircle, X, Loader2 } from 'lucide-react';
 import type { Exam, SelfQuiz, ExamAttempt, Question } from '@/types';
 import { OPTION_LABELS } from '@/types';
-import { createExamResult } from '@/services/api';
+import { addQuestionsToAssessmentBinder, createExamResult } from '@/services/api';
 import { gradeAnswers, formatTime, toFaNum } from '@/services/scoring';
 
 interface ExamEnvProps {
@@ -75,6 +75,9 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
     if (timerRef.current) clearInterval(timerRef.current);
     setSubmitting(true);
     const result = gradeAnswers(answers, questions);
+    const wrongQuestionIds = questions
+      .filter((question, index) => answers[index] !== undefined && answers[index] !== question.correctAnswer)
+      .map(question => question.id);
     const timeSpentSec = Math.floor((Date.now() - startTime) / 1000);
     const attemptData = {
       examId: exam?.id || quiz?.id || '',
@@ -96,6 +99,8 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
         // For self-quizzes, create a temporary attempt object (not persisted)
         savedAttempt = { ...attemptData, id: '' };
       }
+      await addQuestionsToAssessmentBinder(studentId!, wrongQuestionIds);
+      if (wrongQuestionIds.length > 0 && !exam) await reloadDb();
       onComplete(savedAttempt);
     } catch (err: any) {
       notify(err?.message || 'خطا در ثبت پاسخ‌ها', 'error');

@@ -7,6 +7,10 @@
 export type ID = string;
 export type ISODate = string;
 
+export function questionCode(id: ID): string {
+  return `Q-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+}
+
 // --- Educational structure ---
 export interface School {
   id: ID;

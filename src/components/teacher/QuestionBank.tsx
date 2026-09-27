@@ -7,6 +7,7 @@ import {
   Plus, Search, Edit2, Trash2, FileUp, Download, Sparkles, FileText, Filter, BookMarked, Loader2, FileSpreadsheet, Eye, Settings, X, ClipboardPaste, Image as ImageIcon,
 } from 'lucide-react';
 import type { Question, Grade, Difficulty, QuestionType } from '@/types';
+import { questionCode } from '@/types';
 import { OPTION_LABELS, OPTION_NUMBERS } from '@/types';
 import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions } from '@/services/api';
 import { parseCsv, parseFile, downloadSampleCsv, downloadSampleExcel } from '@/services/import';
@@ -33,6 +34,7 @@ export function QuestionBank() {
   const [fDifficulty, setFDifficulty] = useState('');
   const [fType, setFType] = useState('');
   const [fChapter, setFChapter] = useState('');
+  const [fUsage, setFUsage] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -48,6 +50,8 @@ export function QuestionBank() {
     return Array.from(set);
   }, [db.questions]);
 
+  const usedQuestionIds = useMemo(() => new Set(db.exams.flatMap(exam => exam.questionIds)), [db.exams]);
+
   const filtered = useMemo(() => {
     return db.questions.filter(q => {
       if (search && !q.text.includes(search) && !q.explanation.includes(search)) return false;
@@ -55,9 +59,11 @@ export function QuestionBank() {
       if (fDifficulty && q.difficulty !== fDifficulty) return false;
       if (fType && q.type !== fType) return false;
       if (fChapter && q.chapter !== fChapter) return false;
+      if (fUsage === 'used' && !usedQuestionIds.has(q.id)) return false;
+      if (fUsage === 'unused' && usedQuestionIds.has(q.id)) return false;
       return true;
     });
-  }, [db.questions, search, fGrade, fDifficulty, fType, fChapter]);
+  }, [db.questions, search, fGrade, fDifficulty, fType, fChapter, fUsage, usedQuestionIds]);
 
   const openAdd = () => { setForm(emptyQ()); setEditId(null); setShowModal(true); };
   const openEdit = (q: Question) => {
@@ -190,6 +196,7 @@ export function QuestionBank() {
         </div>
         {showFilters && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-fade-in">
+            <Select value={fUsage} onChange={setFUsage} options={[{ value: '', label: 'همه سوالات' }, { value: 'used', label: 'استفاده‌شده در آزمون' }, { value: 'unused', label: 'استفاده‌نشده' }]} />
             <Select value={fGrade} onChange={setFGrade} options={[{ value: '', label: 'همه پایه‌ها' }, ...GRADES.map(g => ({ value: g, label: g }))]} />
             <Select value={fDifficulty} onChange={setFDifficulty} options={[{ value: '', label: 'همه سطوح' }, ...DIFFICULTIES.map(d => ({ value: d, label: d }))]} />
             <Select value={fType} onChange={setFType} options={[{ value: '', label: 'همه تیپ‌ها' }, ...TYPES.map(t => ({ value: t, label: t }))]} />
@@ -207,6 +214,8 @@ export function QuestionBank() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap gap-1.5 mb-2">
+                    <Badge color="primary">{questionCode(q.id)}</Badge>
+                    {usedQuestionIds.has(q.id) ? <Badge color="success">استفاده‌شده</Badge> : <Badge color="neutral">استفاده‌نشده</Badge>}
                     <Badge color="primary">{q.grade}</Badge>
                     <Badge color={diffColor(q.difficulty) as 'success' | 'warning' | 'error'}>{q.difficulty}</Badge>
                     <Badge>{q.type}</Badge>

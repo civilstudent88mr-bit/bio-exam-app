@@ -451,6 +451,36 @@ export async function deleteVaultFolder(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function addQuestionsToAssessmentBinder(studentId: string, questionIds: string[]): Promise<void> {
+  const uniqueQuestionIds = Array.from(new Set(questionIds));
+  if (uniqueQuestionIds.length === 0) return;
+
+  const { data, error } = await supabase
+    .from('vault_folders')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('name', 'کلاسور ارزیابی')
+    .maybeSingle();
+  if (error) throw error;
+
+  if (data) {
+    const currentIds = Array.isArray(data.question_ids) ? data.question_ids as string[] : [];
+    const mergedIds = Array.from(new Set([...currentIds, ...uniqueQuestionIds]));
+    if (mergedIds.length !== currentIds.length) await updateVaultFolder(data.id, mergedIds);
+    return;
+  }
+
+  await createVaultFolder(studentId, 'کلاسور ارزیابی');
+  const { data: created, error: createError } = await supabase
+    .from('vault_folders')
+    .select('id')
+    .eq('student_id', studentId)
+    .eq('name', 'کلاسور ارزیابی')
+    .single();
+  if (createError) throw createError;
+  await updateVaultFolder(created.id, uniqueQuestionIds);
+}
+
 // ============================================================
 // Notes
 // ============================================================
