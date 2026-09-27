@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: 248 250 252;
+    --color-surface: 255 255 255;
+    --color-text: 15 23 42;
+    --color-muted: 100 116 139;
+    --color-border: 226 232 240;
+    --color-primary: 13 148 136;
+    --color-primary-fg: 255 255 255;
+    --color-accent: 245 158 11;
+  }
+
+  .dark {
+    --color-bg: 15 23 42;
+    --color-surface: 30 41 59;
+    --color-text: 241 245 249;
+    --color-muted: 148 163 184;
+    --color-border: 51 65 85;
+    --color-primary: 45 212 191;
+    --color-primary-fg: 15 23 42;
+    --color-accent: 251 191 36;
+  }
+
+  html {
+    font-family: 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  body {
+    background-color: rgb(var(--color-bg));
+    color: rgb(var(--color-text));
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--color-border));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--color-muted));
+  }
+}
+
+@layer components {
+  .surface {
+    background-color: rgb(var(--color-surface));
+    border: 1px solid rgb(var(--color-border));
+  }
+  .text-muted {
+    color: rgb(var(--color-muted));
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    background-color: rgb(var(--color-primary));
+    color: rgb(var(--color-primary-fg));
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  .btn-ghost {
+    background-color: transparent;
+    color: rgb(var(--color-text));
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-color: rgb(var(--color-border) / 0.5);
+  }
+  .btn-outline {
+    background-color: transparent;
+    border: 1px solid rgb(var(--color-border));
+    color: rgb(var(--color-text));
+  }
+  .btn-outline:hover:not(:disabled) {
+    background-color: rgb(var(--color-border) / 0.3);
+  }
+  .input {
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all duration-200;
+    background-color: rgb(var(--color-surface));
+    border: 1px solid rgb(var(--color-border));
+    color: rgb(var(--color-text));
+  }
+  .input:focus {
+    border-color: rgb(var(--color-primary));
+    box-shadow: 0 0 0 3px rgb(var(--color-primary) / 0.15);
+  }
+  .card {
+    @apply rounded-2xl p-5;
+    background-color: rgb(var(--color-surface));
+    border: 1px solid rgb(var(--color-border));
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.25s ease-out;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+}
