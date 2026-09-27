@@ -7,6 +7,7 @@ import { WalletCard } from './WalletCard';
 import { SelfQuizMaker } from './SelfQuizMaker';
 import { AssessmentBinder } from './AssessmentBinder';
 import { StudentQuestionBank } from './StudentQuestionBank';
+import { PerformanceTrend } from './PerformanceTrend';
 import { ExamEnvironment } from './ExamEnvironment';
 import { ResultView } from './ResultView';
 import { PageContainer, StatCard } from '@/components/Header';
@@ -242,6 +243,7 @@ export function StudentDashboard() {
 
           {/* Self quiz maker */}
           <AssessmentBinder onStart={startQuiz} />
+          <PerformanceTrend attempts={myAttempts} exams={db.exams} />
           <StudentQuestionBank />
           <div>
             <SelfQuizMaker onStart={startQuiz} />

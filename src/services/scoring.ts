@@ -1,4 +1,4 @@
-import type { Question, ExamAttempt } from '@/types';
+import type { Question, ExamAttempt, Exam, Student } from '@/types';
 
 // Standard Konkur scoring: (3*correct - wrong) / (3*total) * 100
 export function calcPercentage(correct: number, wrong: number, total: number): number {
@@ -45,6 +45,29 @@ export function formatDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+export interface ExamAnalytics {
+  score: number;
+  classRank: number;
+  classTotal: number;
+  schoolRank: number;
+  schoolTotal: number;
+}
+
+export function getExamAnalytics(attempt: ExamAttempt, exam: Exam | undefined, attempts: ExamAttempt[], students: Student[]): ExamAnalytics {
+  const submitted = attempts.filter(item => item.examId === attempt.examId && item.status === 'submitted');
+  const values = submitted.map(item => item.percentage);
+  const mean = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : attempt.percentage;
+  const variance = values.length > 1 ? values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length : 0;
+  const deviation = Math.sqrt(variance);
+  const score = attempt.score ?? Math.max(1000, Math.min(10000, Math.round(deviation > 0 ? 5000 + ((attempt.percentage - mean) / deviation) * 1000 : 5000)));
+  const student = students.find(item => item.id === attempt.studentId);
+  const schoolId = student?.schoolId || exam?.schoolId;
+  const classAttempts = submitted.filter(item => students.find(candidate => candidate.id === item.studentId)?.classId === student?.classId);
+  const schoolAttempts = submitted.filter(item => students.find(candidate => candidate.id === item.studentId)?.schoolId === schoolId);
+  const rank = (pool: ExamAttempt[]) => 1 + pool.filter(item => item.percentage > attempt.percentage).length;
+  return { score, classRank: rank(classAttempts), classTotal: classAttempts.length, schoolRank: rank(schoolAttempts), schoolTotal: schoolAttempts.length };
 }
 
 export function toFaNum(n: number | string): string {

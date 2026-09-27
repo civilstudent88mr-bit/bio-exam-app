@@ -9,6 +9,7 @@ import {
 import type { Exam, Grade, Difficulty } from '@/types';
 import { createExam, updateExam, deleteExam } from '@/services/api';
 import { printExamPaper, printAnswerSheet, printAnswerKey, printExamResults } from '@/services/pdf';
+import { getExamAnalytics, toFaNum } from '@/services/scoring';
 
 const GRADES: Grade[] = ['دهم', 'یازدهم', 'دوازدهم'];
 const DIFFICULTIES: Difficulty[] = ['ساده', 'متوسط', 'چالشی'];
@@ -28,7 +29,7 @@ export function ExamManager() {
   const { notify } = useToast();
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteId, setحذفId] = useState<string | null>(null);
   const [showResults, setShowResults] = useState<string | null>(null);
   const [mode, setMode] = useState<'manual' | 'auto'>('manual');
   const [saving, setSaving] = useState(false);
@@ -125,7 +126,7 @@ export function ExamManager() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleحذف = async () => {
     if (!deleteId) return;
     setSaving(true);
     try {
@@ -196,7 +197,7 @@ export function ExamManager() {
                     گزارش
                   </button>
                   <button className="btn btn-ghost p-1.5" onClick={() => openEdit(exam)}><Edit2 size={14} /></button>
-                  <button className="btn btn-ghost p-1.5 text-error-500" onClick={() => setDeleteId(exam.id)}><Trash2 size={14} /></button>
+                  <button className="btn btn-ghost p-1.5 text-error-500" onClick={() => setحذفId(exam.id)}><Trash2 size={14} /></button>
                 </div>
               </div>
             );
@@ -327,73 +328,29 @@ export function ExamManager() {
 
       <ResultsModal examId={showResults} onClose={() => setShowResults(null)} />
 
-      <ConfirmModal open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete}
-        title="حذف آزمون" message="آیا از حذف این آزمون و تمام شرکت‌کنندگان آن اطمینان دارید؟" confirmText="حذف" danger />
+      <ConfirmModal open={!!deleteId} onClose={() => setحذفId(null)} onConfirm={handleحذف}
+        title="حذف آزمون" message="آیا از حذف این آزمون اطمینان دارید؟" confirmText="حذف" danger />
     </div>
   );
 }
 
 function ResultsModal({ examId, onClose }: { examId: string | null; onClose: () => void }) {
   const { db } = useApp();
+  const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
   if (!examId) return null;
   const exam = db.exams.find(e => e.id === examId);
   if (!exam) return null;
-  const attempts = db.attempts.filter(a => a.examId === examId);
-
-  const rows = attempts.map(a => {
-    const student = db.students.find(s => s.id === a.studentId);
-    return {
-      name: student?.name || 'نامشخص',
-      percentage: a.percentage,
-      correct: a.correct,
-      wrong: a.wrong,
-      blank: a.blank,
-      timeSpentSec: a.timeSpentSec,
-      paid: true,
-    };
-  }).sort((a, b) => b.percentage - a.percentage);
-
-  return (
-    <Modal open={!!examId} onClose={onClose} title={`گزارش: ${exam.title}`} size="xl">
-      {attempts.length === 0 ? (
-        <EmptyState icon={<Users size={40} />} title="شرکت‌کننده‌ای ندارد" message="هنوز دانش‌آموزی در این آزمون شرکت نکرده است" />
-      ) : (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button className="btn btn-outline" onClick={() => printExamResults(exam.title, exam.code, rows)}>
-              <FileText size={16} /> خروجی PDF
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b" style={{ borderColor: 'rgb(var(--color-border))' }}>
-                  <th className="text-right p-2">ردیف</th>
-                  <th className="text-right p-2">نام</th>
-                  <th className="text-center p-2">درصد</th>
-                  <th className="text-center p-2">درست</th>
-                  <th className="text-center p-2">غلط</th>
-                  <th className="text-center p-2">نزده</th>
-                  <th className="text-center p-2">زمان</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr key={i} className="border-b" style={{ borderColor: 'rgb(var(--color-border))' }}>
-                    <td className="p-2">{i + 1}</td>
-                    <td className="p-2 font-medium">{r.name}</td>
-                    <td className="p-2 text-center font-bold text-primary-600">{r.percentage}٪</td>
-                    <td className="p-2 text-center text-success-600">{r.correct}</td>
-                    <td className="p-2 text-center text-error-500">{r.wrong}</td>
-                    <td className="p-2 text-center text-muted">{r.blank}</td>
-                    <td className="p-2 text-center">{Math.floor(r.timeSpentSec / 60)} دقیقه</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
+  const attempts = db.attempts.filter(a => a.examId === examId && a.status === 'submitted');
+  const rows = attempts.map(attempt => { const student = db.students.find(s => s.id === attempt.studentId); return { attempt, student, analytics: getExamAnalytics(attempt, exam, db.attempts, db.students) }; }).sort((a, b) => b.attempt.percentage - a.attempt.percentage);
+  const selectedAttempt = attempts.find(attempt => attempt.id === selectedAttemptId) || rows[0]?.attempt;
+  const selectedRow = selectedAttempt ? rows.find(row => row.attempt.id === selectedAttempt.id) : undefined;
+  const selectedQuestions = selectedAttempt ? exam.questionIds.map(id => db.questions.find(q => q.id === id)).filter(Boolean) : [];
+  const pdfRows = rows.map(({ attempt, student }) => ({ name: student?.name || 'Unknown student', percentage: attempt.percentage, correct: attempt.correct, wrong: attempt.wrong, blank: attempt.blank, timeSpentSec: attempt.timeSpentSec, paid: true }));
+  return (<Modal open={!!examId} onClose={onClose} title={exam.title} size="xl">
+    {attempts.length === 0 ? <EmptyState icon={<Users size={40} />} title="شرکت‌کننده‌ای ندارد" message="هنوز دانش‌آموزی در این آزمون شرکت نکرده است" /> : <div className="space-y-4">
+      <div className="flex justify-end"><button className="btn btn-outline" onClick={() => printExamResults(exam.title, exam.code, pdfRows)}><FileText size={16} /> خروجی PDF</button></div>
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b" style={{ borderColor: 'rgb(var(--color-border))' }}><th className="text-right p-2">#</th><th className="text-right p-2">نام</th><th className="text-center p-2">درصد</th><th className="text-center p-2">درست</th><th className="text-center p-2">غلط</th><th className="text-center p-2">نزده</th><th className="text-center p-2">تراز</th><th className="text-center p-2">رتبه کلاس</th><th className="text-center p-2">زمان</th></tr></thead><tbody>{rows.map(({ attempt, student, analytics }, index) => <tr key={attempt.id} className="border-b" style={{ borderColor: 'rgb(var(--color-border))' }}><td className="p-2">{index + 1}</td><td className="p-2 font-medium"><button className="text-primary-600 hover:underline" onClick={() => setSelectedAttemptId(attempt.id)}>{student?.name || 'Unknown student'}</button></td><td className="p-2 text-center font-bold text-primary-600">{toFaNum(attempt.percentage)}%</td><td className="p-2 text-center text-success-600">{toFaNum(attempt.correct)}</td><td className="p-2 text-center text-error-500">{toFaNum(attempt.wrong)}</td><td className="p-2 text-center text-muted">{toFaNum(attempt.blank)}</td><td className="p-2 text-center font-bold text-accent-600">{toFaNum(analytics.score)}</td><td className="p-2 text-center">{toFaNum(analytics.classRank)} / {toFaNum(analytics.classTotal)}</td><td className="p-2 text-center">{Math.floor(attempt.timeSpentSec / 60)} min</td></tr>)}</tbody></table></div>
+      {selectedAttempt && selectedRow && <div className="rounded-xl border p-4 space-y-4" style={{ borderColor: 'rgb(var(--color-border))' }}><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold">کارنامه: {db.students.find(s => s.id === selectedAttempt.studentId)?.name || 'نام'}</h3><p className="text-xs text-muted mt-1">جزئیات عملکرد در این آزمون</p></div><div className="text-sm font-medium">تراز: <span className="text-accent-600">{toFaNum(selectedRow.analytics.score)}</span> · Class: {toFaNum(selectedRow.analytics.classRank)} / {toFaNum(selectedRow.analytics.classTotal)} · School: {toFaNum(selectedRow.analytics.schoolRank)} / {toFaNum(selectedRow.analytics.schoolTotal)}</div></div><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center"><div className="rounded-lg bg-primary-50 dark:bg-primary-900/20 p-2"><div className="font-bold">{toFaNum(selectedAttempt.percentage)}%</div><div className="text-xs text-muted">درصد</div></div><div className="rounded-lg bg-success-50 dark:bg-success-900/20 p-2"><div className="font-bold text-success-600">{toFaNum(selectedAttempt.correct)}</div><div className="text-xs text-muted">درست</div></div><div className="rounded-lg bg-error-50 dark:bg-error-900/20 p-2"><div className="font-bold text-error-500">{toFaNum(selectedAttempt.wrong)}</div><div className="text-xs text-muted">غلط</div></div><div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-2"><div className="font-bold">{toFaNum(selectedAttempt.blank)}</div><div className="text-xs text-muted">نزده</div></div></div><div className="space-y-2 max-h-64 overflow-y-auto">{selectedQuestions.map((question, index) => { if (!question) return null; const answer = selectedAttempt.answers[index]; const status = answer === undefined ? 'نزده' : answer === question.correctAnswer ? 'درست' : 'غلط'; const statusClass = answer === undefined ? 'text-muted' : answer === question.correctAnswer ? 'text-success-600' : 'text-error-500'; return <div key={question.id} className="flex items-center justify-between gap-3 border-b pb-2 text-sm" style={{ borderColor: 'rgb(var(--color-border))' }}><span className="truncate">{toFaNum(index + 1)}. {question.text}</span><span className={'shrink-0 font-medium ' + statusClass}>{status}</span></div>; })}</div></div>}
+    </div>}
+  </Modal>);
 }

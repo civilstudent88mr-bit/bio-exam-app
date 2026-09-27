@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import type { ExamAttempt, Question } from '@/types';
 import { OPTION_LABELS } from '@/types';
-import { toFaNum, formatTime } from '@/services/scoring';
+import { toFaNum, formatTime, getExamAnalytics } from '@/services/scoring';
 import { printReportCard } from '@/services/pdf';
 import {
   createVaultFolder, updateVaultFolder, deleteVaultFolder,
@@ -35,6 +35,8 @@ export function ResultView({ attempt, questions, onExit }: ResultViewProps) {
 
   const student = db.students.find(s => s.id === studentId);
   const studentName = student?.name || 'دانش‌آموز';
+  const exam = db.exams.find(e => e.id === attempt.examId);
+  const analytics = getExamAnalytics(attempt, exam, db.attempts, db.students);
 
   const wrongQs = questions.filter((_, i) => {
     const ans = attempt.answers[i];
@@ -166,6 +168,11 @@ export function ResultView({ attempt, questions, onExit }: ResultViewProps) {
               <div className="text-xl font-bold text-primary-600">{formatTime(attempt.timeSpentSec)}</div>
               <div className="text-xs text-muted">زمان</div>
             </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 border-t p-4" style={{ borderColor: 'rgb(var(--color-border))' }}>
+            <div className="text-center"><div className="text-xl font-bold text-accent-600">{toFaNum(analytics.score)}</div><div className="text-xs text-muted">تراز</div></div>
+            <div className="text-center"><div className="text-xl font-bold text-primary-600">{toFaNum(analytics.classRank)} از {toFaNum(analytics.classTotal)}</div><div className="text-xs text-muted">رتبه کلاس</div></div>
+            <div className="text-center"><div className="text-xl font-bold text-primary-600">{toFaNum(analytics.schoolRank)} از {toFaNum(analytics.schoolTotal)}</div><div className="text-xs text-muted">رتبه مدرسه</div></div>
           </div>
         </div>
 

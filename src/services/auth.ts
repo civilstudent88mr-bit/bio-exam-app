@@ -9,17 +9,17 @@ function authEmail(role: 'teacher' | 'student', name: string): string {
   return `${role}.${(hash >>> 0).toString(36)}@accounts.bioexam.local`;
 }
 
-export async function establishAuthSession(role: 'teacher' | 'student', name: string, password: string): Promise<string> {
+export async function establishAuthSession(role: 'teacher' | 'student', name: string, password: string, allowSignup = false): Promise<string> {
   const email = authEmail(role, name);
   const login = await supabase.auth.signInWithPassword({ email, password });
   let data: { user: NonNullable<typeof login.data.user> | null; session: NonNullable<typeof login.data.session> | null } = login.data;
   let error = login.error;
-  if (error) {
+  if (error && allowSignup) {
     const signup = await supabase.auth.signUp({ email, password, options: { data: { role, display_name: name } } });
     data = { user: signup.data.user, session: signup.data.session };
     error = signup.error;
   }
-  if (error) throw new Error(error.message);
+  if (error) throw new Error('نام کاربری یا رمز عبور اشتباه است');
   if (!data.user || !data.session) throw new Error('در تنظیمات Supabase گزینه تأیید ایمیل را خاموش کنید و دوباره تلاش کنید');
   return data.user.id;
 }

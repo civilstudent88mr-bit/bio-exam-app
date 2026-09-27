@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Form';
 import { BookOpen, LogIn, Loader2, KeyRound, Phone } from 'lucide-react';
-import { createTeacher, loginTeacher, resetTeacherPassword } from '@/services/api';
+import { createTeacher, getTeacherByAuthUser, resetTeacherPassword } from '@/services/api';
 import { normalizeName, validatePassword, isLocked, getLockoutRemaining, recordFailedAttempt, clearLockout, establishAuthSession } from '@/services/auth';
 import { linkTeacherAuth } from '@/services/api';
 
@@ -57,14 +57,14 @@ export function TeacherLogin() {
     try {
       if (mode === 'register') {
         if (!canRegister) { notify('ثبت‌نام دبیر جدید بسته است', 'error'); return; }
-        const teacher = await createTeacher(normName, password, phone.trim());
-        const authUserId = await establishAuthSession('teacher', normName, password);
-        await linkTeacherAuth(teacher.id, authUserId);
+        const authUserId = await establishAuthSession('teacher', normName, password, true);
+        const teacher = await createTeacher(normName, password, phone.trim(), authUserId);
         clearLockout(ROLE);
         setTeacherId(teacher.id);
         notify('ثبت‌نام موفق', 'success');
       } else {
-        const teacher = await loginTeacher(normName, password);
+        const authUserId = await establishAuthSession('teacher', normName, password);
+        const teacher = await getTeacherByAuthUser(authUserId);
         if (!teacher) {
           const st = recordFailedAttempt(ROLE);
           if (st.lockedUntil > 0) {
@@ -75,8 +75,6 @@ export function TeacherLogin() {
           }
           return;
         }
-        const authUserId = await establishAuthSession('teacher', normName, password);
-        if (teacher.authUserId !== authUserId) await linkTeacherAuth(teacher.id, authUserId);
         clearLockout(ROLE);
         setTeacherId(teacher.id);
         notify('ورود موفق', 'success');

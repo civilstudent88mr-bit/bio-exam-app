@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Badge, EmptyState, Select } from '@/components/ui/Form';
 import { formatDate, toFaNum } from '@/services/scoring';
-import { Search, Users, Wallet, Phone, KeyRound, School, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Users, Wallet, Phone, School, ChevronDown, ChevronUp } from 'lucide-react';
 
 export function StudentDirectory() {
   const { db } = useApp();
@@ -65,7 +65,7 @@ export function StudentDirectory() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm mt-3">
                 <thead><tr className="text-right text-muted border-b" style={{ borderColor: 'rgb(var(--color-border))' }}>
-                  <th className="py-2 px-2">نام و نام خانوادگی</th><th className="py-2 px-2">تلفن</th><th className="py-2 px-2">رمز عبور</th><th className="py-2 px-2">کیف پول</th><th className="py-2 px-2">جزئیات</th>
+                  <th className="py-2 px-2">نام و نام خانوادگی</th><th className="py-2 px-2">تلفن</th><th className="py-2 px-2">وضعیت احراز هویت</th><th className="py-2 px-2">کیف پول</th><th className="py-2 px-2">جزئیات</th>
                 </tr></thead>
                 <tbody>{students.map(student => {
                   const transactions = db.transactions.filter(item => item.studentId === student.id);
@@ -74,7 +74,7 @@ export function StudentDirectory() {
                     <tr key={student.id} className="border-b" style={{ borderColor: 'rgb(var(--color-border))' }}>
                       <td className="py-3 px-2 font-medium">{student.name}</td>
                       <td className="py-3 px-2"><span className="inline-flex items-center gap-1"><Phone size={13} /> {student.phone || 'ثبت نشده'}</span></td>
-                      <td className="py-3 px-2"><span className="inline-flex items-center gap-1 font-mono text-xs"><KeyRound size={13} /> {student.password}</span></td>
+                      <td className="py-3 px-2"><Badge color={student.authUserId ? 'success' : 'warning'}>{student.authUserId ? 'احراز‌شده' : 'نیازمند ورود مجدد'}</Badge></td>
                       <td className="py-3 px-2"><span className="inline-flex items-center gap-1"><Wallet size={13} /> {toFaNum(student.walletBalance.toLocaleString('fa-IR'))}</span></td>
                       <td className="py-3 px-2"><button className="btn btn-ghost py-1.5 px-2 text-xs" onClick={() => setExpandedId(expanded ? null : student.id)}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />} تراکنش‌ها</button></td>
                     </tr>

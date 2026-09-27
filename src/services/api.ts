@@ -50,12 +50,12 @@ function mapClass(row: any): ClassGroup {
   return { id: row.id, schoolId: row.school_id, name: row.name, createdAt: row.created_at };
 }
 function mapTeacher(row: any): Teacher {
-  return { id: row.id, name: row.name, password: row.password, phone: row.phone || '', createdAt: row.created_at, authUserId: row.auth_user_id || null };
+  return { id: row.id, name: row.name, password: '', phone: row.phone || '', createdAt: row.created_at, authUserId: row.auth_user_id || null };
 }
 function mapStudent(row: any): Student {
   return {
     id: row.id, name: row.name, schoolId: row.school_id, classId: row.class_id,
-    password: row.password, phone: row.phone || '', walletBalance: row.wallet_balance, createdAt: row.created_at, authUserId: row.auth_user_id || null,
+    password: '', phone: row.phone || '', walletBalance: row.wallet_balance, createdAt: row.created_at, authUserId: row.auth_user_id || null,
   };
 }
 function mapQuestion(row: any): Question {
@@ -83,7 +83,7 @@ function mapAttempt(row: any): ExamAttempt {
     startedAt: row.started_at, submittedAt: row.submitted_at,
     status: row.status, correct: row.correct, wrong: row.wrong,
     blank: row.blank, percentage: Number(row.percentage),
-    timeSpentSec: row.time_spent_sec,
+    timeSpentSec: row.time_spent_sec, score: row.score == null ? undefined : Number(row.score),
   };
 }
 function mapSelfQuiz(row: any): SelfQuiz {
@@ -144,8 +144,8 @@ export async function loadDatabase(): Promise<Database> {
   const [schools, classes, teachers, students, questions, exams, attempts, selfQuizzes, vaultFolders, notes, transactions, handouts, handoutPurchases, paymentSettings, cardTransfers] = await Promise.all([
     supabase.from('schools').select('*').then(r => r.data || []),
     supabase.from('classes').select('*').then(r => r.data || []),
-    supabase.from('teachers').select('*').then(r => r.data || []),
-    supabase.from('students').select('*').then(r => r.data || []),
+    supabase.from('teachers').select('id,name,phone,created_at,auth_user_id').then(r => r.data || []),
+    supabase.from('students').select('id,name,school_id,class_id,phone,wallet_balance,created_at,auth_user_id').then(r => r.data || []),
     supabase.from('question_bank').select('*').then(r => r.data || []),
     supabase.from('exams').select('*').then(r => r.data || []),
     supabase.from('exam_results').select('*').then(r => r.data || []),
@@ -213,8 +213,8 @@ export async function deleteClass(id: string): Promise<void> {
 // Teachers
 // ============================================================
 
-export async function createTeacher(name: string, password: string, phone: string): Promise<Teacher> {
-  const { data, error } = await supabase.from('teachers').insert({ name, password, phone }).select().single();
+export async function createTeacher(name: string, password: string, phone: string, authUserId?: string): Promise<Teacher> {
+  const { data, error } = await supabase.from('teachers').insert({ name, password: '', phone, auth_user_id: authUserId || null }).select().single();
   if (error) throw error;
   return mapTeacher(data);
 }
@@ -226,22 +226,23 @@ export async function loginTeacher(name: string, password: string): Promise<Teac
   return data ? mapTeacher(data) : null;
 }
 
-export async function resetTeacherPassword(name: string, phone: string, newPassword: string): Promise<void> {
-  const { data, error: selErr } = await supabase.from('teachers')
-    .select('id').eq('name', name).eq('phone', phone).maybeSingle();
-  if (selErr) throw selErr;
-  if (!data) throw new Error('نام کاربری یا شماره تماس اشتباه است');
-  const { error: updErr } = await supabase.from('teachers').update({ password: newPassword }).eq('id', data.id);
-  if (updErr) throw updErr;
+export async function getTeacherByAuthUser(authUserId: string): Promise<Teacher | null> {
+  const { data, error } = await supabase.from('teachers').select('*').eq('auth_user_id', authUserId).maybeSingle();
+  if (error) throw error;
+  return data ? mapTeacher(data) : null;
+}
+
+export async function resetTeacherPassword(_name: string, _phone: string, _newPassword: string): Promise<void> {
+  throw new Error('Password reset must be completed through the authenticated account flow.');
 }
 
 // ============================================================
 // Students
 // ============================================================
 
-export async function createStudent(name: string, schoolId: string, classId: string, password: string, phone: string): Promise<Student> {
+export async function createStudent(name: string, schoolId: string, classId: string, password: string, phone: string, authUserId?: string): Promise<Student> {
   const { data, error } = await supabase.from('students').insert({
-    name, school_id: schoolId, class_id: classId, password, phone, wallet_balance: 0,
+    name, school_id: schoolId, class_id: classId, password: '', phone, wallet_balance: 0, auth_user_id: authUserId || null,
   }).select().single();
   if (error) throw error;
   return mapStudent(data);
@@ -254,13 +255,14 @@ export async function loginStudent(name: string, password: string): Promise<Stud
   return data ? mapStudent(data) : null;
 }
 
-export async function resetStudentPassword(name: string, phone: string, newPassword: string): Promise<void> {
-  const { data, error: selErr } = await supabase.from('students')
-    .select('id').eq('name', name).eq('phone', phone).maybeSingle();
-  if (selErr) throw selErr;
-  if (!data) throw new Error('نام کاربری یا شماره تماس اشتباه است');
-  const { error: updErr } = await supabase.from('students').update({ password: newPassword }).eq('id', data.id);
-  if (updErr) throw updErr;
+export async function getStudentByAuthUser(authUserId: string): Promise<Student | null> {
+  const { data, error } = await supabase.from('students').select('*').eq('auth_user_id', authUserId).maybeSingle();
+  if (error) throw error;
+  return data ? mapStudent(data) : null;
+}
+
+export async function resetStudentPassword(_name: string, _phone: string, _newPassword: string): Promise<void> {
+  throw new Error('Password reset must be completed through the authenticated account flow.');
 }
 
 export async function updateStudentWallet(studentId: string, newBalance: number): Promise<void> {
@@ -381,7 +383,7 @@ export async function createExamResult(attempt: Omit<ExamAttempt, 'id'>): Promis
     started_at: attempt.startedAt, submitted_at: attempt.submittedAt,
     status: attempt.status, correct: attempt.correct, wrong: attempt.wrong,
     blank: attempt.blank, percentage: attempt.percentage,
-    time_spent_sec: attempt.timeSpentSec,
+    time_spent_sec: attempt.timeSpentSec, score: attempt.score ?? null,
   }).select().single();
   if (error) throw error;
   return mapAttempt(data);

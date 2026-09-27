@@ -104,6 +104,7 @@ export interface ExamAttempt {
   blank: number;
   percentage: number;
   timeSpentSec: number;
+  score?: number;
 }
 
 // --- Student self-quizzes ---
