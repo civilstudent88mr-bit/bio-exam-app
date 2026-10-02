@@ -60,7 +60,7 @@ function mapStudent(row: any): Student {
 }
 function mapQuestion(row: any): Question {
   return {
-    id: row.id, text: row.text, options: row.options,
+    id: row.id, text: row.text, imageUrl: row.image_url || undefined, options: row.options,
     correctAnswer: row.correct_answer, explanation: row.explanation,
     keyNote: row.key_note, grade: row.grade, chapter: row.chapter,
     section: row.section, difficulty: row.difficulty, type: row.type,
@@ -296,9 +296,18 @@ export async function fetchQuestions(): Promise<Question[]> {
   return (data || []).map(mapQuestion);
 }
 
+export async function uploadQuestionImage(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('فقط فایل تصویری مجاز است');
+  if (file.size > 5 * 1024 * 1024) throw new Error('حجم تصویر نباید بیشتر از ۵ مگابایت باشد');
+  const extension = file.name.split('.').pop()?.toLowerCase() || 'png';
+  const path = `questions/${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage.from('question-images').upload(path, file, { cacheControl: '31536000', upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from('question-images').getPublicUrl(path).data.publicUrl;
+}
 export async function createQuestion(q: Omit<Question, 'id' | 'createdAt'>): Promise<Question> {
   const { data, error } = await supabase.from('question_bank').insert({
-    text: q.text, options: q.options, correct_answer: q.correctAnswer,
+    text: q.text, image_url: q.imageUrl || null, options: q.options, correct_answer: q.correctAnswer,
     explanation: q.explanation, key_note: q.keyNote, grade: q.grade,
     chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
   }).select().single();
@@ -308,7 +317,7 @@ export async function createQuestion(q: Omit<Question, 'id' | 'createdAt'>): Pro
 
 export async function updateQuestion(id: string, q: Omit<Question, 'id' | 'createdAt'>): Promise<void> {
   const { error } = await supabase.from('question_bank').update({
-    text: q.text, options: q.options, correct_answer: q.correctAnswer,
+    text: q.text, image_url: q.imageUrl || null, options: q.options, correct_answer: q.correctAnswer,
     explanation: q.explanation, key_note: q.keyNote, grade: q.grade,
     chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
   }).eq('id', id);
@@ -322,7 +331,7 @@ export async function deleteQuestion(id: string): Promise<void> {
 
 export async function batchCreateQuestions(qs: Omit<Question, 'id' | 'createdAt'>[]): Promise<Question[]> {
   const rows = qs.map(q => ({
-    text: q.text, options: q.options, correct_answer: q.correctAnswer,
+    text: q.text, image_url: q.imageUrl || null, options: q.options, correct_answer: q.correctAnswer,
     explanation: q.explanation, key_note: q.keyNote, grade: q.grade,
     chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
   }));

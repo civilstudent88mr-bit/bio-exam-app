@@ -9,7 +9,7 @@ import {
 import type { Question, Grade, Difficulty, QuestionType } from '@/types';
 import { questionCode } from '@/types';
 import { OPTION_LABELS, OPTION_NUMBERS } from '@/types';
-import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions } from '@/services/api';
+import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions, uploadQuestionImage } from '@/services/api';
 import { parseCsv, parseFile, downloadSampleCsv, downloadSampleExcel } from '@/services/import';
 import { extractFromText, extractFromImages, fileToBase64, getApiKey, setApiKey } from '@/services/aiImport';
 
@@ -20,7 +20,7 @@ const TYPES: QuestionType[] = ['مفهومی', 'خط‌به‌خط', 'ترکیب
 const emptyQ = (): Omit<Question, 'id' | 'createdAt'> => ({
   text: '', options: ['', '', '', ''], correctAnswer: 0,
   explanation: '', keyNote: '', grade: 'دهم', chapter: '', section: '',
-  difficulty: 'متوسط', type: 'مفهومی',
+  difficulty: 'متوسط', type: 'مفهومی', imageUrl: '',
 });
 
 export function QuestionBank() {
@@ -43,6 +43,8 @@ export function QuestionBank() {
   const [previewQuestions, setPreviewQuestions] = useState<Omit<Question, 'id' | 'createdAt'>[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chapters = useMemo(() => {
@@ -65,9 +67,10 @@ export function QuestionBank() {
     });
   }, [db.questions, search, fGrade, fDifficulty, fType, fChapter, fUsage, usedQuestionIds]);
 
-  const openAdd = () => { setForm(emptyQ()); setEditId(null); setShowModal(true); };
+  const openAdd = () => { setForm(emptyQ()); setImageFile(null); setImagePreview(''); setEditId(null); setShowModal(true); };
   const openEdit = (q: Question) => {
-    setForm({ text: q.text, options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation, keyNote: q.keyNote, grade: q.grade, chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type });
+    setForm({ text: q.text, imageUrl: q.imageUrl || '', options: q.options, correctAnswer: q.correctAnswer, explanation: q.explanation, keyNote: q.keyNote, grade: q.grade, chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type });
+    setImageFile(null); setImagePreview(q.imageUrl || '');
     setEditId(q.id);
     setShowModal(true);
   };
@@ -77,11 +80,13 @@ export function QuestionBank() {
     if (form.options.some(o => !o.trim())) { notify('هر چهار گزینه باید پر باشد', 'warning'); return; }
     setSaving(true);
     try {
+      const imageUrl = imageFile ? await uploadQuestionImage(imageFile) : form.imageUrl;
+      const questionForm = { ...form, imageUrl };
       if (editId) {
-        await updateQuestion(editId, form);
+        await updateQuestion(editId, questionForm);
         notify('سوال ویرایش شد', 'success');
       } else {
-        await createQuestion(form);
+        await createQuestion(questionForm);
         notify('سوال اضافه شد', 'success');
       }
       await reloadDb();
@@ -139,7 +144,7 @@ export function QuestionBank() {
       const qsWithoutIds = previewQuestions.map(q => ({
         text: q.text, options: q.options, correctAnswer: q.correctAnswer,
         explanation: q.explanation, keyNote: q.keyNote, grade: q.grade,
-        chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
+        chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type, imageUrl: '',
       }));
       await batchCreateQuestions(qsWithoutIds);
       await reloadDb();
@@ -221,7 +226,7 @@ export function QuestionBank() {
                     <Badge>{q.type}</Badge>
                     {q.chapter && <Badge color="neutral">{q.chapter}</Badge>}
                   </div>
-                  <p className="text-sm font-medium mb-2">{q.text}</p>
+                  <p className="text-sm font-medium mb-2">{q.text}</p>{q.imageUrl && <img src={q.imageUrl} alt="شکل سوال" className="max-h-48 rounded-lg object-contain border mb-2" />}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
                     {q.options.map((o, i) => (
                       <div key={i} className={`flex items-center gap-1.5 ${i === q.correctAnswer ? 'text-success-600 font-bold' : 'text-muted'}`}>
@@ -254,7 +259,11 @@ export function QuestionBank() {
         <div className="space-y-4">
           <Field label="متن سوال">
             <textarea className="input min-h-[80px]" value={form.text} onChange={e => setForm({ ...form, text: e.target.value })} />
-          </Field>
+          </Field>           <Field label="تصویر سوال (اختیاری)">
+             <input className="input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e => { const file = e.target.files?.[0] || null; setImageFile(file); setImagePreview(file ? URL.createObjectURL(file) : form.imageUrl || ''); }} />
+             <p className="text-xs text-muted mt-1">فرمت‌های PNG، JPG، WEBP و GIF تا حجم ۵ مگابایت</p>
+             {imagePreview && <div className="relative mt-2 inline-block"><img src={imagePreview} alt="پیش‌نمایش تصویر سوال" className="max-h-48 max-w-full rounded-lg border object-contain" /><button type="button" className="absolute -top-2 -left-2 btn btn-ghost p-1 bg-white dark:bg-gray-800 rounded-full" onClick={() => { setImageFile(null); setImagePreview(''); setForm({ ...form, imageUrl: '' }); }}><X size={14} /></button></div>}
+           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" dir="rtl">
             {form.options.map((opt, i) => (
               <Field key={i} label={`گزینه ${OPTION_NUMBERS[i]} (${OPTION_LABELS[i]})`}>

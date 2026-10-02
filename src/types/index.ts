@@ -60,6 +60,7 @@ export const OPTION_NUMBERS = ['۱', '۲', '۳', '۴'] as const;
 export interface Question {
   id: ID;
   text: string;
+  imageUrl?: string;
   options: [string, string, string, string];
   correctAnswer: 0 | 1 | 2 | 3;
   explanation: string;

@@ -179,7 +179,7 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
                     <Star size={18} fill={isBookmarked ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <p className="text-sm font-medium mb-4 leading-relaxed">{q.text}</p>
+                <p className="text-sm font-medium mb-4 leading-relaxed">{q.text}</p>{q.imageUrl && <img src={q.imageUrl} alt="شکل سوال" className="max-h-72 w-full rounded-lg border object-contain mb-4" />}
                 <div className="grid grid-cols-1 gap-2">
                   {q.options.map((opt, i) => (
                     <button key={i} className={`flex items-center gap-3 p-3 rounded-xl text-right text-sm transition-all ${selected === i ? 'bg-primary-50 dark:bg-primary-900/30 border-2 border-primary-400' : 'border-2 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
