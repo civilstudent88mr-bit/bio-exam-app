@@ -72,9 +72,9 @@ async function verifyTeacher(req: Request) {
   const elevatedKey = serviceRoleKey || secretKey;
   const databaseKey = elevatedKey || anonKey;
   const teacherResponse = await fetch(`${supabaseUrl}/rest/v1/teachers?${query}`, {
-    headers: { apikey: databaseKey, Authorization: `Bearer ${elevatedKey || token}` },
+    headers: { apikey: databaseKey, Authorization: `Bearer ${authorizationToken}` },
   });
-  if (!teacherResponse.ok) return { userId: '', errorCode: 'teacher_query_failed' };
+  if (!teacherResponse.ok) return { userId: '', errorCode: `teacher_query_failed_${teacherResponse.status}` };
   const teachers = await teacherResponse.json() as Array<{ id: string }>;
   return teachers[0] ? { userId: user.id } : { userId: '', errorCode: 'teacher_profile_not_linked' };
 }
