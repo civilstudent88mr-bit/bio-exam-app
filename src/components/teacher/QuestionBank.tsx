@@ -503,7 +503,9 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
         section: aiSection || undefined,
         provider: aiProvider,
         apiKey: aiApiKey.trim() || undefined,
-        sourceText: [answerText.trim(), answerFilePreviews.length ? 'The final uploaded images are explanation images.' : ''].filter(Boolean).join('\n\n') || undefined,
+        sourceText: answerText.trim() || undefined,
+        questionImageCount: filePreviews.length,
+        answerImageCount: answerFilePreviews.length,
       };
       let result: Omit<Question, 'id' | 'createdAt'>[];
       if (tab === 'paste') {

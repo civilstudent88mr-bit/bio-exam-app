@@ -21,16 +21,7 @@ const MAX_IMAGE_DATA_URL_LENGTH = 7_000_000;
 const MAX_TEXT_LENGTH = 50_000;
 const PROVIDER_BASE_URLS = { avalai: 'https://api.avalai.ir/v1', openai: 'https://api.openai.com/v1' } as const;
 
-const SYSTEM_PROMPT = `تو یک دستیار متخصص استخراج سوالات چهارگزینه‌ای زیست‌شناسی هستی.
-از متن یا تصاویر آزمون، فقط سوالات چهارگزینه‌ای را استخراج کن.
-برای هر سوال متن، دقیقاً چهار گزینه، شماره گزینه صحیح از 1 تا 4، پاسخ تشریحی، نکته کلیدی، سطح دشواری و نوع سوال را برگردان.
-سطح دشواری فقط یکی از «ساده»، «متوسط»، «چالشی» باشد.
-نوع سوال فقط یکی از «مفهومی»، «خط‌به‌خط»، «ترکیبی»، «شکل‌دار»، «شماری» باشد.
-پاسخ را فقط به صورت JSON با ساختار زیر برگردان:
-{"questions":[{"text":"...","options":["...","...","...","..."],"correctAnswer":1,"explanation":"...","keyNote":"...","difficulty":"متوسط","type":"مفهومی"}]}
-اگر پاسخ صحیح از تصویر قابل تشخیص نیست، حدس نزن و سوال را برنگردان.`;
-
-function send(res: Response, status: number, body: unknown) {
+const SYSTEM_PROMPT = \`You are a strict exam-question transcription engine. Extract multiple-choice biology questions from the supplied text and images.\n\nNON-NEGOTIABLE SOURCE RULES:\n1. Treat supplied question images and text as the only source of truth. Transcribe exactly what is visible. Preserve Persian wording, punctuation, numbers, symbols, scientific names, and line meaning. Do not correct, rewrite, summarize, translate, or complete missing text from your own knowledge.\n2. Question images come first. Any images after the marker 'The final uploaded images are explanation images.' are explanation/answer images. Do not mix their content with question text.\n3. Explanation text or explanation images are the only source for the explanation field and correct answer. Copy the explanation faithfully, including all steps and details. Never shorten it or replace it with general knowledge.\n4. Select correctAnswer only when supported by supplied answer text or explanation image. Never solve from memory.\n5. Never invent options, explanations, or facts. If text is unreadable, keep the closest visible transcription instead of guessing.\n\nOUTPUT RULES:\n- Return JSON only, no Markdown or commentary.\n- Each question must have exactly four options.\n- correctAnswer is 1 to 4 and must match the supplied answer material.\n- difficulty is one of: ساده, متوسط, چالشی.\n- type is one of: مفهومی, خط‌به‌خط, ترکیبی, شکل‌دار, شمارشی.\n- Keep explanation as a faithful transcription, not a generated summary.\n- Exact shape: {\"questions\":[{\"text\":\"...\",\"options\":[\"...\",\"...\",\"...\",\"...\"],\"correctAnswer\":1,\"explanation\":\"...\",\"keyNote\":\"...\",\"difficulty\":\"متوسط\",\"type\":\"مفهومی\"}]}\`;\n\nfunction send(res: Response, status: number, body: unknown) {
   res.status(status).json(body);
 }
 
@@ -108,7 +99,7 @@ export default async function handler(req: Request, res: Response) {
     if (!teacher?.userId) return send(res, 401, { error: 'Teacher authentication is invalid.', code: teacher?.errorCode || 'unauthorized' });
     if (!isAllowed(getClientKey(req, teacher.userId))) return send(res, 429, { error: 'تعداد درخواست‌ها زیاد است. یک دقیقه بعد دوباره تلاش کنید.' });
 
-    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; provider?: unknown; apiKey?: unknown; options?: { grade?: string; chapter?: string; section?: string } };
+    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; provider?: unknown; apiKey?: unknown; options?: { grade?: string; chapter?: string; section?: string; questionImageCount?: number; answerImageCount?: number } };
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const images = Array.isArray(body.images) ? body.images.filter((image): image is string => typeof image === 'string') : [];
     if (!text && images.length === 0) return send(res, 400, { error: 'متن یا تصویر ارسال نشده است.' });
@@ -121,7 +112,11 @@ export default async function handler(req: Request, res: Response) {
     if (!apiKey) return send(res, 503, { error: 'سرویس هوش مصنوعی هنوز در تنظیمات سرور فعال نشده است.' });
     const content: Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string } }> = [];
     content.push({ type: 'text', text: `${text}\n\nپایه: ${body.options?.grade || 'نامشخص'}\nفصل: ${body.options?.chapter || 'نامشخص'}\nمبحث: ${body.options?.section || 'نامشخص'}` });
-    for (const image of images) content.push({ type: 'image_url', image_url: { url: image } });
+    const questionImageCount = Math.max(0, Math.min(images.length, Number(body.options?.questionImageCount) || images.length));
+    for (const [index, image] of images.entries()) {
+      if (index === questionImageCount && index > 0) content.push({ type: 'text', text: 'The next images are explanation/answer images. Copy their explanation exactly and use them as the only source for correctAnswer.' });
+      content.push({ type: 'image_url', image_url: { url: image } });
+    }
 
     const openAiResponse = await fetch(`${provider === 'avalai' ? PROVIDER_BASE_URLS.avalai : PROVIDER_BASE_URLS.openai}/chat/completions`, {
       method: 'POST',
