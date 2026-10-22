@@ -117,7 +117,7 @@ async function callOpenAI(userContent: string, images: string[], opts: AIExtract
     let msg = `خطای API (${res.status})`;
     try {
       const parsed = JSON.parse(errBody);
-      msg = parsed.error?.message || (parsed.code ? ${msg}:  : msg);
+      msg = parsed.error?.message || (parsed.code ? `${msg}: ${parsed.code}` : msg);
     } catch { /* keep default */ }
     throw new Error(msg);
   }
