@@ -307,7 +307,7 @@ export async function uploadQuestionImage(file: File): Promise<string> {
 }
 export async function createQuestion(q: Omit<Question, 'id' | 'createdAt'>): Promise<Question> {
   const { data, error } = await supabase.from('question_bank').insert({
-    text: q.text, image_url: q.imageUrl || null, options: q.options, correct_answer: q.correctAnswer,
+    text: q.text, ...(q.imageUrl ? { image_url: q.imageUrl } : {}), options: q.options, correct_answer: q.correctAnswer,
     explanation: q.explanation, key_note: q.keyNote, grade: q.grade,
     chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
   }).select().single();
@@ -317,7 +317,7 @@ export async function createQuestion(q: Omit<Question, 'id' | 'createdAt'>): Pro
 
 export async function updateQuestion(id: string, q: Omit<Question, 'id' | 'createdAt'>): Promise<void> {
   const { error } = await supabase.from('question_bank').update({
-    text: q.text, image_url: q.imageUrl || null, options: q.options, correct_answer: q.correctAnswer,
+    text: q.text, ...(q.imageUrl ? { image_url: q.imageUrl } : {}), options: q.options, correct_answer: q.correctAnswer,
     explanation: q.explanation, key_note: q.keyNote, grade: q.grade,
     chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
   }).eq('id', id);
@@ -331,7 +331,7 @@ export async function deleteQuestion(id: string): Promise<void> {
 
 export async function batchCreateQuestions(qs: Omit<Question, 'id' | 'createdAt'>[]): Promise<Question[]> {
   const rows = qs.map(q => ({
-    text: q.text, image_url: q.imageUrl || null, options: q.options, correct_answer: q.correctAnswer,
+    text: q.text, ...(q.imageUrl ? { image_url: q.imageUrl } : {}), options: q.options, correct_answer: q.correctAnswer,
     explanation: q.explanation, key_note: q.keyNote, grade: q.grade,
     chapter: q.chapter, section: q.section, difficulty: q.difficulty, type: q.type,
   }));
