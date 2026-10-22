@@ -394,6 +394,8 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [aiGrade, setAiGrade] = useState('');
   const [aiChapter, setAiChapter] = useState('');
   const [aiSection, setAiSection] = useState('');
+  const [aiProvider, setAiProvider] = useState<'avalai' | 'openai'>('avalai');
+  const [aiApiKey, setAiApiKey] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -407,6 +409,8 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
       setAiGrade('');
       setAiChapter('');
       setAiSection('');
+      setAiProvider('avalai');
+      setAiApiKey('');
     }
   }, [open]);
 
@@ -446,6 +450,8 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
         grade: (aiGrade || undefined) as Grade | undefined,
         chapter: aiChapter || undefined,
         section: aiSection || undefined,
+        provider: aiProvider,
+        apiKey: aiApiKey.trim() || undefined,
       };
       let result: Omit<Question, 'id' | 'createdAt'>[];
       if (tab === 'paste') {
@@ -499,7 +505,13 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                   <ClipboardPaste size={16} /> چسباندن متن
                 </button>
               </div>
-              <span className="text-xs text-muted">AI امن با کلید سروری</span>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <select className="input py-1.5 w-auto" value={aiProvider} onChange={e => setAiProvider(e.target.value as 'avalai' | 'openai')}>
+                  <option value="avalai">AvalAI</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+                <input className="input py-1.5 w-56" type="password" value={aiApiKey} onChange={e => setAiApiKey(e.target.value)} placeholder="کلید API (ذخیره نمی‌شود)" autoComplete="off" />
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">

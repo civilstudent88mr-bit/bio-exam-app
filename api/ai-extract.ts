@@ -19,6 +19,7 @@ const MAX_REQUESTS_PER_WINDOW = 5;
 const MAX_IMAGES = 6;
 const MAX_IMAGE_DATA_URL_LENGTH = 7_000_000;
 const MAX_TEXT_LENGTH = 50_000;
+const PROVIDER_BASE_URLS = { avalai: 'https://api.avalai.ir/v1', openai: 'https://api.openai.com/v1' } as const;
 
 const SYSTEM_PROMPT = `تو یک دستیار متخصص استخراج سوالات چهارگزینه‌ای زیست‌شناسی هستی.
 از متن یا تصاویر آزمون، فقط سوالات چهارگزینه‌ای را استخراج کن.
@@ -107,20 +108,22 @@ export default async function handler(req: Request, res: Response) {
     if (!teacher) return send(res, 401, { error: 'ورود معلم معتبر نیست.' });
     if (!isAllowed(getClientKey(req, teacher.userId))) return send(res, 429, { error: 'تعداد درخواست‌ها زیاد است. یک دقیقه بعد دوباره تلاش کنید.' });
 
-    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; options?: { grade?: string; chapter?: string; section?: string } };
+    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; provider?: unknown; apiKey?: unknown; options?: { grade?: string; chapter?: string; section?: string } };
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const images = Array.isArray(body.images) ? body.images.filter((image): image is string => typeof image === 'string') : [];
     if (!text && images.length === 0) return send(res, 400, { error: 'متن یا تصویر ارسال نشده است.' });
     if (text.length > MAX_TEXT_LENGTH || images.length > MAX_IMAGES || images.some(image => image.length > MAX_IMAGE_DATA_URL_LENGTH)) return send(res, 413, { error: 'حجم ورودی بیش از حد مجاز است.' });
     if (images.some(image => !/^data:image\/(jpeg|png|webp|gif);base64,/i.test(image))) return send(res, 400, { error: 'فرمت تصویر مجاز نیست.' });
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const provider = body.provider === 'openai' ? 'openai' : 'avalai';
+    const suppliedApiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
+    const apiKey = suppliedApiKey || (provider === 'avalai' ? process.env.AVALAI_API_KEY : process.env.OPENAI_API_KEY);
     if (!apiKey) return send(res, 503, { error: 'سرویس هوش مصنوعی هنوز در تنظیمات سرور فعال نشده است.' });
     const content: Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string } }> = [];
     content.push({ type: 'text', text: `${text}\n\nپایه: ${body.options?.grade || 'نامشخص'}\nفصل: ${body.options?.chapter || 'نامشخص'}\nمبحث: ${body.options?.section || 'نامشخص'}` });
     for (const image of images) content.push({ type: 'image_url', image_url: { url: image } });
 
-    const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openAiResponse = await fetch(`${provider === 'avalai' ? PROVIDER_BASE_URLS.avalai : PROVIDER_BASE_URLS.openai}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0.1 }),

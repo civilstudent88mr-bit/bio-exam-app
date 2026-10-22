@@ -32,6 +32,8 @@ export interface AIExtractOptions {
   grade?: Grade;
   chapter?: string;
   section?: string;
+  provider?: 'avalai' | 'openai';
+  apiKey?: string;
 }
 
 interface AIQuestion {
@@ -103,7 +105,7 @@ async function callOpenAI(userContent: string, images: string[], opts: AIExtract
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ text: userContent, images, options: opts }),
+    body: JSON.stringify({ text: userContent, images, options: opts, provider: opts.provider, apiKey: opts.apiKey }),
   });
 
   if (!res.ok) {
