@@ -112,12 +112,12 @@ export default async function handler(req: Request, res: Response) {
     const suppliedApiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
     const apiKey = suppliedApiKey || (provider === 'avalai' ? process.env.AVALAI_API_KEY : process.env.OPENAI_API_KEY);
     if (!apiKey) return send(res, 503, { error: 'سرویس هوش مصنوعی هنوز در تنظیمات سرور فعال نشده است.' });
-    const content: Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string } }> = [];
+    const content: Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string; detail?: 'high' | 'low' | 'auto' } }> = [];
     content.push({ type: 'text', text: `${text}\n\nپایه: ${body.options?.grade || 'نامشخص'}\nفصل: ${body.options?.chapter || 'نامشخص'}\nمبحث: ${body.options?.section || 'نامشخص'}` });
     const questionImageCount = Math.max(0, Math.min(images.length, Number(body.options?.questionImageCount) || images.length));
     for (const [index, image] of images.entries()) {
       if (index === questionImageCount && index > 0) content.push({ type: 'text', text: 'The next images are explanation/answer images. Copy their explanation exactly and use them as the only source for correctAnswer.' });
-      content.push({ type: 'image_url', image_url: { url: image } });
+      content.push({ type: 'image_url', image_url: { url: image, detail: 'high' } });
     }
 
     let openAiResponse: Response;
@@ -125,7 +125,7 @@ export default async function handler(req: Request, res: Response) {
       openAiResponse = await fetch(`${provider === 'avalai' ? PROVIDER_BASE_URLS.avalai : PROVIDER_BASE_URLS.openai}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0.1 }),
+        body: JSON.stringify({ model: process.env.AI_VISION_MODEL || 'gpt-4o', messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0, max_tokens: 8000 }),
       });
     } catch (error) {
       console.error('AI provider request failed', error instanceof Error ? error.message : 'unknown error');
