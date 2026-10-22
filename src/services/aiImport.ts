@@ -34,6 +34,7 @@ export interface AIExtractOptions {
   section?: string;
   provider?: 'avalai' | 'openai';
   apiKey?: string;
+  sourceText?: string;
 }
 
 interface AIQuestion {
@@ -138,7 +139,7 @@ export async function extractFromImages(
   images: string[],
   opts: AIExtractOptions = {}
 ): Promise<Omit<Question, 'id' | 'createdAt'>[]> {
-  const raw = await callOpenAI('', images, opts);
+  const raw = await callOpenAI(opts.sourceText || '', images, opts);
   return normalizeQuestions(raw, opts);
 }
 

@@ -389,6 +389,7 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [parsed, setParsed] = useState<Omit<Question, 'id' | 'createdAt'>[]>([]);
   const [saving, setSaving] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [answerText, setAnswerText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [aiGrade, setAiGrade] = useState('');
@@ -404,6 +405,7 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
       setTab('upload');
       setParsed([]);
       setPasteText('');
+      setAnswerText('');
       setFiles([]);
       setFilePreviews([]);
       setAiGrade('');
@@ -435,6 +437,23 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
     e.target.value = '';
   };
 
+  const handleClipboardPaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const imageItem = Array.from(e.clipboardData.items).find(item => item.type.startsWith('image/'));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      notify('Image is larger than 10 MB', 'warning');
+      return;
+    }
+    const preview = await fileToBase64(file);
+    setFiles(prev => [...prev, file]);
+    setFilePreviews(prev => [...prev, preview]);
+    setTab('upload');
+    notify('Image pasted from clipboard', 'success');
+  };
+
   const removeFile = (idx: number) => {
     setFiles(prev => prev.filter((_, i) => i !== idx));
     setFilePreviews(prev => prev.filter((_, i) => i !== idx));
@@ -452,10 +471,12 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
         section: aiSection || undefined,
         provider: aiProvider,
         apiKey: aiApiKey.trim() || undefined,
+        sourceText: answerText.trim() || undefined,
       };
       let result: Omit<Question, 'id' | 'createdAt'>[];
       if (tab === 'paste') {
-        result = await extractFromText(pasteText, opts);
+        const combinedText = [pasteText.trim() ? 'متن سؤال و گزینه‌ها:\n' + pasteText.trim() : '', answerText.trim() ? 'Explanation:\n' + answerText.trim() : ''].filter(Boolean).join('\n\n');
+        result = await extractFromText(combinedText, opts);
       } else {
         result = await extractFromImages(filePreviews, opts);
       }
@@ -495,7 +516,7 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
     <>
       <Modal open={open} onClose={onClose} title="استخراج هوشمند سوالات با AI" size="xl">
         {step === 'input' && (
-          <div className="space-y-4">
+          <div className="space-y-4" onPaste={handleClipboardPaste}>
             <div className="flex items-center justify-between">
               <div className="flex rounded-xl p-1" style={{ backgroundColor: 'rgb(var(--color-border) / 0.4)' }}>
                 <button className={`flex-1 btn py-2 px-4 text-sm ${tab === 'upload' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('upload')}>
@@ -536,6 +557,7 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                 >
                   <FileUp size={32} className="mx-auto mb-2 text-muted" />
                   <p className="text-sm font-medium">تصاویر سوالات یا صفحات PDF آزمون را آپلود کنید</p>
+                  <p className="text-xs text-primary-600 mt-1">تصویر را می‌توانید مستقیماً با Ctrl+V پیست کنید</p>
                   <p className="text-xs text-muted mt-1">JPG, PNG — حداکثر ۱۰ مگابایت</p>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
@@ -553,14 +575,24 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                     ))}
                   </div>
                 )}
+                <Field label="پاسخ تشریحی (اختیاری)">
+                  <textarea className="input min-h-[120px] text-sm" placeholder="پاسخ تشریحی را جداگانه اینجا پیست کنید..."
+                    value={answerText} onChange={e => setAnswerText(e.target.value)} />
+                </Field>
               </div>
             )}
 
             {tab === 'paste' && (
               <div className="space-y-2">
                 <p className="text-sm text-muted">متن کامل سوالات و گزینه‌ها را اینجا جای‌گذاری کنید. هوش مصنوعی سوالات را تفکیک می‌کند.</p>
-                <textarea className="input min-h-[250px] text-sm" placeholder="متن سوالات را اینجا بچسبانید..."
-                  value={pasteText} onChange={e => setPasteText(e.target.value)} />
+                <Field label="Question text and options">
+                  <textarea className="input min-h-[180px] text-sm" placeholder="متن سؤال و چهار گزینه را اینجا پیست کنید..."
+                    value={pasteText} onChange={e => setPasteText(e.target.value)} />
+                </Field>
+                <Field label="پاسخ تشریحی (اختیاری)">
+                  <textarea className="input min-h-[140px] text-sm" placeholder="Paste the explanation separately here..."
+                    value={answerText} onChange={e => setAnswerText(e.target.value)} />
+                </Field>
               </div>
             )}
 
