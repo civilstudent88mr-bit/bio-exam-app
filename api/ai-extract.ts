@@ -125,10 +125,24 @@ export default async function handler(req: Request, res: Response) {
     });
     if (!openAiResponse.ok) return send(res, 502, { error: 'پاسخ سرویس هوش مصنوعی دریافت نشد.' });
     const result = await openAiResponse.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const parsed = JSON.parse(result.choices?.[0]?.message?.content || '{}');
+    const rawContent = result.choices?.[0]?.message?.content || '';
+    const jsonCandidate = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonCandidate);
+    } catch {
+      const jsonStart = jsonCandidate.indexOf('{');
+      const jsonEnd = jsonCandidate.lastIndexOf('}');
+      if (jsonStart < 0 || jsonEnd <= jsonStart) return send(res, 502, { error: 'AI returned an invalid JSON response.', code: 'invalid_ai_json' });
+      try {
+        parsed = JSON.parse(jsonCandidate.slice(jsonStart, jsonEnd + 1));
+      } catch {
+        return send(res, 502, { error: 'AI returned an invalid JSON response.', code: 'invalid_ai_json' });
+      }
+    }
     return send(res, 200, { questions: sanitizeQuestions(parsed) });
   } catch (error) {
     console.error('AI extraction failed', error instanceof Error ? error.message : 'unknown error');
-    return send(res, 500, { error: 'استخراج سوالات با خطای سرور مواجه شد.' });
+    return send(res, 500, { error: 'AI extraction failed on the server.', code: 'ai_processing_failed' });
   }
 }
