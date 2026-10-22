@@ -68,9 +68,11 @@ async function verifyTeacher(req: Request) {
 
   const query = new URLSearchParams({ select: 'id', auth_user_id: `eq.${user.id}`, limit: '1' });
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const databaseKey = serviceRoleKey || anonKey;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const elevatedKey = serviceRoleKey || secretKey;
+  const databaseKey = elevatedKey || anonKey;
   const teacherResponse = await fetch(`${supabaseUrl}/rest/v1/teachers?${query}`, {
-    headers: { apikey: databaseKey, Authorization: `Bearer ${serviceRoleKey || token}` },
+    headers: { apikey: databaseKey, Authorization: `Bearer ${elevatedKey || token}` },
   });
   if (!teacherResponse.ok) return null;
   const teachers = await teacherResponse.json() as Array<{ id: string }>;
