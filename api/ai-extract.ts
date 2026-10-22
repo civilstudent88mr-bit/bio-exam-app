@@ -57,14 +57,14 @@ async function verifyTeacher(req: Request) {
   const token = auth?.startsWith('Bearer ') ? auth.slice(7) : '';
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-  if (!token || !supabaseUrl || !anonKey) return null;
+  if (!token || !supabaseUrl || !anonKey) return { userId: '', errorCode: 'missing_auth_config' };
 
   const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
   });
-  if (!userResponse.ok) return null;
+  if (!userResponse.ok) return { userId: '', errorCode: 'supabase_user_rejected' };
   const user = await userResponse.json() as { id?: string };
-  if (!user.id) return null;
+  if (!user.id) return { userId: '', errorCode: 'invalid_user' };
 
   const query = new URLSearchParams({ select: 'id', auth_user_id: `eq.${user.id}`, limit: '1' });
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,9 +74,9 @@ async function verifyTeacher(req: Request) {
   const teacherResponse = await fetch(`${supabaseUrl}/rest/v1/teachers?${query}`, {
     headers: { apikey: databaseKey, Authorization: `Bearer ${elevatedKey || token}` },
   });
-  if (!teacherResponse.ok) return null;
+  if (!teacherResponse.ok) return { userId: '', errorCode: 'teacher_query_failed' };
   const teachers = await teacherResponse.json() as Array<{ id: string }>;
-  return teachers[0] ? { userId: user.id } : null;
+  return teachers[0] ? { userId: user.id } : { userId: '', errorCode: 'teacher_profile_not_linked' };
 }
 
 function sanitizeQuestions(value: unknown) {
@@ -109,7 +109,7 @@ export default async function handler(req: Request, res: Response) {
 
   try {
     const teacher = await verifyTeacher(req);
-    if (!teacher) return send(res, 401, { error: 'ورود معلم معتبر نیست.' });
+    if (!teacher?.userId) return send(res, 401, { error: 'Teacher authentication is invalid.', code: teacher?.errorCode || 'unauthorized' });
     if (!isAllowed(getClientKey(req, teacher.userId))) return send(res, 429, { error: 'تعداد درخواست‌ها زیاد است. یک دقیقه بعد دوباره تلاش کنید.' });
 
     const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; provider?: unknown; apiKey?: unknown; options?: { grade?: string; chapter?: string; section?: string } };
