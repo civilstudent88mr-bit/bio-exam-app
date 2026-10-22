@@ -67,14 +67,8 @@ async function verifyTeacher(req: Request) {
   if (!user.id) return { userId: '', errorCode: 'invalid_user' };
 
   const query = new URLSearchParams({ select: 'id', auth_user_id: `eq.${user.id}`, limit: '1' });
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-  const configuredElevatedKey = serviceRoleKey || secretKey;
-  const isSecretKey = configuredElevatedKey?.startsWith('sb_secret_') ?? false;
-  const databaseKey = configuredElevatedKey || anonKey;
-  const authorizationToken = serviceRoleKey && !isSecretKey ? serviceRoleKey : token;
   const teacherResponse = await fetch(`${supabaseUrl}/rest/v1/teachers?${query}`, {
-    headers: { apikey: databaseKey, Authorization: `Bearer ${authorizationToken}` },
+    headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
   });
   if (!teacherResponse.ok) return { userId: '', errorCode: `teacher_query_failed_${teacherResponse.status}` };
   const teachers = await teacherResponse.json() as Array<{ id: string }>;
