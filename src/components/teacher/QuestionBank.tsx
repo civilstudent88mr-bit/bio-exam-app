@@ -391,13 +391,17 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [pasteText, setPasteText] = useState('');
   const [answerText, setAnswerText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
+  const [answerFiles, setAnswerFiles] = useState<File[]>([]);
+  const [answerFilePreviews, setAnswerFilePreviews] = useState<string[]>([]);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [aiGrade, setAiGrade] = useState('');
   const [aiChapter, setAiChapter] = useState('');
   const [aiSection, setAiSection] = useState('');
   const [aiProvider, setAiProvider] = useState<'avalai' | 'openai'>('avalai');
   const [aiApiKey, setAiApiKey] = useState('');
+  const [clipboardTarget, setClipboardTarget] = useState<'question' | 'answer'>('question');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const answerFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -408,6 +412,8 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
       setAnswerText('');
       setFiles([]);
       setFilePreviews([]);
+      setAnswerFiles([]);
+      setAnswerFilePreviews([]);
       setAiGrade('');
       setAiChapter('');
       setAiSection('');
@@ -448,15 +454,41 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
       return;
     }
     const preview = await fileToBase64(file);
-    setFiles(prev => [...prev, file]);
-    setFilePreviews(prev => [...prev, preview]);
+    if (clipboardTarget === 'answer') {
+      setAnswerFiles(prev => [...prev, file]);
+      setAnswerFilePreviews(prev => [...prev, preview]);
+    } else {
+      setFiles(prev => [...prev, file]);
+      setFilePreviews(prev => [...prev, preview]);
+    }
     setTab('upload');
-    notify('Image pasted from clipboard', 'success');
+    notify(clipboardTarget === 'answer' ? 'Answer image pasted from clipboard' : 'Question image pasted from clipboard', 'success');
+  };
+
+
+  const handleAnswerFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []).filter(file => file.type.startsWith('image/'));
+    const previews: string[] = [];
+    for (const file of selected) {
+      if (file.size > 10 * 1024 * 1024) {
+        notify('Image is larger than 10 MB', 'warning');
+        continue;
+      }
+      previews.push(await fileToBase64(file));
+    }
+    setAnswerFiles(prev => [...prev, ...selected]);
+    setAnswerFilePreviews(prev => [...prev, ...previews]);
+    e.target.value = '';
   };
 
   const removeFile = (idx: number) => {
     setFiles(prev => prev.filter((_, i) => i !== idx));
     setFilePreviews(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeAnswerFile = (idx: number) => {
+    setAnswerFiles(prev => prev.filter((_, i) => i !== idx));
+    setAnswerFilePreviews(prev => prev.filter((_, i) => i !== idx));
   };
 
   const startExtraction = async () => {
@@ -471,14 +503,14 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
         section: aiSection || undefined,
         provider: aiProvider,
         apiKey: aiApiKey.trim() || undefined,
-        sourceText: answerText.trim() || undefined,
+        sourceText: [answerText.trim(), answerFilePreviews.length ? 'The final uploaded images are explanation images.' : ''].filter(Boolean).join('\n\n') || undefined,
       };
       let result: Omit<Question, 'id' | 'createdAt'>[];
       if (tab === 'paste') {
         const combinedText = [pasteText.trim() ? 'متن سؤال و گزینه‌ها:\n' + pasteText.trim() : '', answerText.trim() ? 'Explanation:\n' + answerText.trim() : ''].filter(Boolean).join('\n\n');
         result = await extractFromText(combinedText, opts);
       } else {
-        result = await extractFromImages(filePreviews, opts);
+        result = await extractFromImages([...filePreviews, ...answerFilePreviews], opts);
       }
       if (result.length === 0) {
         notify('هیچ سوال چهارگزینه‌ای استخراج نشد. متن یا تصویر را بررسی کنید', 'warning');
@@ -553,7 +585,8 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                 <div
                   className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:border-primary-400 transition-colors"
                   style={{ borderColor: 'rgb(var(--color-border))' }}
-                  onClick={() => fileInputRef.current?.click()}
+                  onFocus={() => setClipboardTarget('question')}
+                  onClick={() => { setClipboardTarget('question'); fileInputRef.current?.click(); }}
                 >
                   <FileUp size={32} className="mx-auto mb-2 text-muted" />
                   <p className="text-sm font-medium">تصاویر سوالات یا صفحات PDF آزمون را آپلود کنید</p>
@@ -569,6 +602,31 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                         <img src={src} alt={`page ${idx + 1}`} className="w-full h-32 object-cover" />
                         <button className="absolute top-1 left-1 btn btn-ghost p-1 rounded-lg bg-black/40 text-white"
                           onClick={() => removeFile(idx)}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div
+                  className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 transition-colors"
+                  style={{ borderColor: 'rgb(var(--color-border))' }}
+                  tabIndex={0}
+                  onFocus={() => setClipboardTarget('answer')}
+                  onClick={() => { setClipboardTarget('answer'); answerFileInputRef.current?.click(); }}
+                >
+                  <FileUp size={28} className="mx-auto mb-2 text-muted" />
+                  <p className="text-sm font-medium">تصویر پاسخ تشریحی را آپلود یا با Ctrl+V پیست کنید</p>
+                  <p className="text-xs text-muted mt-1">برای پاسخ تشریحی چند تصویر هم قابل افزودن است</p>
+                </div>
+                <input ref={answerFileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAnswerFileSelect} />
+                {answerFilePreviews.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {answerFilePreviews.map((src, idx) => (
+                      <div key={idx} className="relative rounded-xl overflow-hidden" style={{ border: '1px solid rgb(var(--color-border))' }}>
+                        <img src={src} alt={'answer ' + idx} className="w-full h-32 object-cover" />
+                        <button className="absolute top-1 left-1 btn btn-ghost p-1 rounded-lg bg-black/40 text-white" onClick={() => removeAnswerFile(idx)}>
                           <X size={14} />
                         </button>
                       </div>
