@@ -118,13 +118,25 @@ export default async function handler(req: Request, res: Response) {
       content.push({ type: 'image_url', image_url: { url: image } });
     }
 
-    const openAiResponse = await fetch(`${provider === 'avalai' ? PROVIDER_BASE_URLS.avalai : PROVIDER_BASE_URLS.openai}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0.1 }),
-    });
-    if (!openAiResponse.ok) return send(res, 502, { error: 'پاسخ سرویس هوش مصنوعی دریافت نشد.' });
-    const result = await openAiResponse.json() as { choices?: Array<{ message?: { content?: string } }> };
+    let openAiResponse: Response;
+    try {
+      openAiResponse = await fetch(`${provider === 'avalai' ? PROVIDER_BASE_URLS.avalai : PROVIDER_BASE_URLS.openai}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0.1 }),
+      });
+    } catch (error) {
+      console.error('AI provider request failed', error instanceof Error ? error.message : 'unknown error');
+      return send(res, 502, { error: 'AI provider connection failed.', code: 'provider_request_failed' });
+    }
+    const providerBody = await openAiResponse.text();
+    let result: { choices?: Array<{ message?: { content?: string } }> };
+    try {
+      result = JSON.parse(providerBody);
+    } catch {
+      return send(res, 502, { error: 'AI provider returned a non-JSON response.', code: 'provider_invalid_response', status: openAiResponse.status });
+    }
+    if (!openAiResponse.ok) return send(res, 502, { error: 'AI provider rejected the request.', code: 'provider_http_error', status: openAiResponse.status });
     const rawContent = result.choices?.[0]?.message?.content || '';
     const jsonCandidate = rawContent.replaceAll('```json', '').replaceAll('```', '').trim();
     let parsed: unknown;
