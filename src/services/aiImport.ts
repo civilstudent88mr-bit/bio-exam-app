@@ -97,7 +97,11 @@ async function callOpenAI(userContent: string, images: string[], opts: AIExtract
   }
 
   const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
+  let accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    accessToken = refreshed.session?.access_token;
+  }
   if (!accessToken) throw new Error('جلسه ورود معلم منقضی شده است. لطفاً دوباره وارد شوید.');
   const res = await fetch('/api/ai-extract', {
     method: 'POST',
