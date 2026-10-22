@@ -11,7 +11,7 @@ import { questionCode } from '@/types';
 import { OPTION_LABELS, OPTION_NUMBERS } from '@/types';
 import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions, uploadQuestionImage } from '@/services/api';
 import { parseCsv, parseFile, downloadSampleCsv, downloadSampleExcel } from '@/services/import';
-import { extractFromText, extractFromImages, fileToBase64, getApiKey, setApiKey } from '@/services/aiImport';
+import { extractFromText, extractFromImages, fileToBase64 } from '@/services/aiImport';
 
 const GRADES: Grade[] = ['دهم', 'یازدهم', 'دوازدهم'];
 const DIFFICULTIES: Difficulty[] = ['ساده', 'متوسط', 'چالشی'];
@@ -394,9 +394,6 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [aiGrade, setAiGrade] = useState('');
   const [aiChapter, setAiChapter] = useState('');
   const [aiSection, setAiSection] = useState('');
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [keyInput, setKeyInput] = useState('');
-  const [keyLoading, setKeyLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -488,27 +485,6 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
     }
   };
 
-  const openKeyModal = async () => {
-    try {
-      const key = await getApiKey();
-      setKeyInput(key || '');
-    } catch { setKeyInput(''); }
-    setShowKeyModal(true);
-  };
-
-  const saveKey = async () => {
-    setKeyLoading(true);
-    try {
-      await setApiKey(keyInput.trim());
-      notify('کلید API ذخیره شد', 'success');
-      setShowKeyModal(false);
-    } catch (err: any) {
-      notify(err?.message || 'خطا در ذخیره کلید', 'error');
-    } finally {
-      setKeyLoading(false);
-    }
-  };
-
   return (
     <>
       <Modal open={open} onClose={onClose} title="استخراج هوشمند سوالات با AI" size="xl">
@@ -523,9 +499,7 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                   <ClipboardPaste size={16} /> چسباندن متن
                 </button>
               </div>
-              <button className="btn btn-ghost text-sm" onClick={openKeyModal}>
-                <Settings size={16} /> تنظیمات کلید API
-              </button>
+              <span className="text-xs text-muted">AI امن با کلید سروری</span>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
@@ -664,24 +638,6 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
         )}
       </Modal>
 
-      <Modal open={showKeyModal} onClose={() => setShowKeyModal(false)} title="تنظیمات کلید OpenAI API" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-muted">
-            کلید API OpenAI خود را وارد کنید. این کلید برای استخراج سوالات توسط هوش مصنوعی استفاده می‌شود.
-            می‌توانید کلید را از <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary-500 underline">پنل OpenAI</a> دریافت کنید.
-          </p>
-          <Field label="کلید API">
-            <input className="input font-mono text-xs" value={keyInput} onChange={e => setKeyInput(e.target.value)}
-              placeholder="sk-..." type="password" />
-          </Field>
-          <div className="flex gap-3 justify-end">
-            <button className="btn btn-outline" onClick={() => setShowKeyModal(false)}>انصراف</button>
-            <button className="btn btn-primary" onClick={saveKey} disabled={keyLoading}>
-              {keyLoading ? <Loader2 size={16} className="animate-spin" /> : null} ذخیره کلید
-            </button>
-          </div>
-        </div>
-      </Modal>
     </>
   );
 }

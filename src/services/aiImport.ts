@@ -34,23 +34,6 @@ export interface AIExtractOptions {
   section?: string;
 }
 
-export async function getApiKey(): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('app_settings')
-    .select('openai_api_key')
-    .eq('id', 1)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.openai_api_key || null;
-}
-
-export async function setApiKey(key: string): Promise<void> {
-  const { error } = await supabase
-    .from('app_settings')
-    .upsert({ id: 1, openai_api_key: key, updated_at: new Date().toISOString() }, { onConflict: 'id' });
-  if (error) throw error;
-}
-
 interface AIQuestion {
   text: string;
   options: string[];
@@ -97,7 +80,7 @@ function normalizeQuestions(
     });
 }
 
-async function callOpenAI(apiKey: string, userContent: string, images: string[]): Promise<AIQuestion[]> {
+async function callOpenAI(userContent: string, images: string[], opts: AIExtractOptions): Promise<AIQuestion[]> {
   const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
 
   if (userContent) {
@@ -111,21 +94,16 @@ async function callOpenAI(apiKey: string, userContent: string, images: string[])
     throw new Error('هیچ ورودی برای استخراج ارائه نشده است');
   }
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error('جلسه ورود معلم منقضی شده است. لطفاً دوباره وارد شوید.');
+  const res = await fetch('/api/ai-extract', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
-    }),
+    body: JSON.stringify({ text: userContent, images, options: opts }),
   });
 
   if (!res.ok) {
@@ -139,19 +117,14 @@ async function callOpenAI(apiKey: string, userContent: string, images: string[])
   }
 
   const data = await res.json();
-  const contentStr = data.choices?.[0]?.message?.content || '{}';
-  const parsed = JSON.parse(contentStr);
-  return parsed.questions || [];
+  return data.questions || [];
 }
 
 export async function extractFromText(
   text: string,
   opts: AIExtractOptions = {}
 ): Promise<Omit<Question, 'id' | 'createdAt'>[]> {
-  const apiKey = await getApiKey();
-  if (!apiKey) throw new Error('کلید API تنظیم نشده است. ابتدا از دکمه تنظیمات، کلید OpenAI خود را وارد کنید.');
-
-  const raw = await callOpenAI(apiKey, text, []);
+  const raw = await callOpenAI(text, [], opts);
   return normalizeQuestions(raw, opts);
 }
 
@@ -159,10 +132,7 @@ export async function extractFromImages(
   images: string[],
   opts: AIExtractOptions = {}
 ): Promise<Omit<Question, 'id' | 'createdAt'>[]> {
-  const apiKey = await getApiKey();
-  if (!apiKey) throw new Error('کلید API تنظیم نشده است. ابتدا از دکمه تنظیمات، کلید OpenAI خود را وارد کنید.');
-
-  const raw = await callOpenAI(apiKey, '', images);
+  const raw = await callOpenAI('', images, opts);
   return normalizeQuestions(raw, opts);
 }
 
