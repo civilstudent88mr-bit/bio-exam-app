@@ -9,7 +9,7 @@ import { genExamCode, loadDb } from './storage';
 function formatQuestionText(text: string): string {
   return text
     .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]+(?=(?:الف|ب|ج|د)\s*[-–—:.)])/g, '\n')
+    .replace(/\s*(?=(?:\u0627\u0644\u0641|\u0628|\u062c|\u062f)[\s\u200c]*(?:\u0640|[-\u2013\u2014:.)]))/g, '\n')
     .replace(/[ \t]*\n[ \t]*/g, '\n')
     .trim();
 }
