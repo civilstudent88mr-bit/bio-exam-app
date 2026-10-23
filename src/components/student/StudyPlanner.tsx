@@ -42,8 +42,9 @@ export function StudyPlanner() {
     if (student.walletBalance < PLAN_PRICE) { notify('موجودی کیف پول برای دریافت برنامه هفتگی کافی نیست.', 'error'); return; }
     setGenerating(true);
     try {
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session?.access_token) throw new Error('جلسه ورود دانش‌آموز منقضی شده است.');
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session) session = (await supabase.auth.refreshSession()).data.session;
+      if (!session?.access_token) throw new Error('???? ???? ????????? ????? ??? ???? ????? ?????? ???? ???? ? ?????? ???? ????.');
       const response = await fetch('/api/study-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ grade: grade.trim(), subjects: subjectList, topics: topics.trim(), weekStart }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'تولید برنامه با خطا مواجه شد.');
