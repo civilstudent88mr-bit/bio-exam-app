@@ -16,9 +16,23 @@ export function StudentQuestionBank() {
   const [chapter, setChapter] = useState('');
   const [usage, setUsage] = useState('');
   const usedQuestionIds = useMemo(() => new Set(db.exams.flatMap(exam => exam.questionIds)), [db.exams]);
+  const visibleQuestionIds = useMemo(() => {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const examByQuestion = new Map<string, number[]>();
+    for (const exam of db.exams) {
+      const endAt = new Date(exam.endAt).getTime();
+      if (!Number.isFinite(endAt)) continue;
+      for (const questionId of exam.questionIds) {
+        const ends = examByQuestion.get(questionId) || [];
+        ends.push(endAt);
+        examByQuestion.set(questionId, ends);
+      }
+    }
+    return new Set(Array.from(examByQuestion.entries()).filter(([, ends]) => ends.every(endAt => endAt <= cutoff)).map(([questionId]) => questionId));
+  }, [db.exams]);
   const chapters = useMemo(() => Array.from(new Set(db.questions.map(question => question.chapter).filter(Boolean))), [db.questions]);
   const filtered = useMemo(() => db.questions.filter(question => {
-    if (!usedQuestionIds.has(question.id)) return false;
+    if (!usedQuestionIds.has(question.id) || !visibleQuestionIds.has(question.id)) return false;
     if (search && !`${question.text} ${questionCode(question.id)}`.includes(search.trim())) return false;
     if (grade && question.grade !== grade) return false;
     if (difficulty && question.difficulty !== difficulty) return false;
@@ -26,7 +40,7 @@ export function StudentQuestionBank() {
     if (usage === 'used' && !usedQuestionIds.has(question.id)) return false;
     if (usage === 'unused' && usedQuestionIds.has(question.id)) return false;
     return true;
-  }), [db.questions, search, grade, difficulty, chapter, usage, usedQuestionIds]);
+  }), [db.questions, search, grade, difficulty, chapter, usage, usedQuestionIds, visibleQuestionIds]);
 
   return <section className="card space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold flex items-center gap-2"><BookOpen size={19} className="text-primary-500" /> بانک سوالات</h3><p className="text-sm text-muted mt-1">مشاهده شناسه، پایه، دشواری و سابقه استفاده هر تست</p></div><Badge color="primary">{filtered.length} از {db.questions.length}</Badge></div>
