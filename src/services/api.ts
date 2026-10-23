@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type {
   School, ClassGroup, Teacher, Student, Question, Exam, ExamAttempt,
   SelfQuiz, VaultFolder, Note, Transaction, Database, Handout, HandoutPurchase,
-  PaymentSettings, CardTransfer,
+  PaymentSettings, CardTransfer, StudyPlan, StudyDay,
 } from '@/types';
 import { genExamCode, loadDb } from './storage';
 
@@ -118,6 +118,19 @@ function mapTransaction(row: any): Transaction {
     type: row.type, description: row.description, createdAt: row.created_at,
   };
 }
+function mapStudyPlan(row: any): StudyPlan {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    grade: row.grade,
+    subjects: row.subjects || [],
+    topics: row.topics || '',
+    weekStart: row.week_start,
+    days: row.plan || [],
+    price: Number(row.price || 0),
+    createdAt: row.created_at,
+  };
+}
 function mapHandout(row: any): Handout {
   return {
     id: row.id, title: row.title, description: row.description || '', price: row.price,
@@ -148,7 +161,7 @@ function mapCardTransfer(row: any): CardTransfer {
 
 export async function loadDatabase(): Promise<Database> {
   await migrateLocalStorageIfNeeded();
-  const [schools, classes, teachers, students, questions, exams, attempts, selfQuizzes, vaultFolders, notes, transactions, handouts, handoutPurchases, paymentSettings, cardTransfers] = await Promise.all([
+  const [schools, classes, teachers, students, questions, exams, attempts, selfQuizzes, vaultFolders, notes, transactions, studyPlans, handouts, handoutPurchases, paymentSettings, cardTransfers] = await Promise.all([
     supabase.from('schools').select('*').then(r => r.data || []),
     supabase.from('classes').select('*').then(r => r.data || []),
     supabase.from('teachers').select('id,name,phone,created_at,auth_user_id').then(r => r.data || []),
@@ -160,6 +173,7 @@ export async function loadDatabase(): Promise<Database> {
     supabase.from('vault_folders').select('*').then(r => r.data || []),
     supabase.from('notes').select('*').then(r => r.data || []),
     supabase.from('transactions').select('*').then(r => r.data || []),
+    supabase.from('study_plans').select('*').order('week_start', { ascending: false }).then(r => r.data || []),
     supabase.from('handouts').select('*').order('created_at', { ascending: false }).then(r => r.data || []),
     supabase.from('handout_purchases').select('*').then(r => r.data || []),
     supabase.from('payment_settings').select('*').eq('id', 1).maybeSingle().then(r => r.data),
@@ -179,6 +193,7 @@ export async function loadDatabase(): Promise<Database> {
     vaultFolders: vaultFolders.map(mapVaultFolder),
     notes: notes.map(mapNote),
     transactions: transactions.map(mapTransaction),
+    studyPlans: studyPlans.map(mapStudyPlan),
     handouts: handouts.map(mapHandout),
     handoutPurchases: handoutPurchases.map(mapHandoutPurchase),
     paymentSettings: paymentSettings ? mapPaymentSettings(paymentSettings) : null,
@@ -520,6 +535,25 @@ export async function createNote(note: Omit<Note, 'id' | 'createdAt'>): Promise<
 
 export async function deleteNote(id: string): Promise<void> {
   const { error } = await supabase.from('notes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+
+export async function fetchStudyPlans(studentId: string): Promise<StudyPlan[]> {
+  const { data, error } = await supabase.from('study_plans').select('*').eq('student_id', studentId).order('week_start', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapStudyPlan);
+}
+
+export async function purchaseStudyPlan(plan: { studentId: string; grade: string; subjects: string[]; topics: string; weekStart: string; days: StudyDay[]; price: number }): Promise<StudyPlan> {
+  const { data, error } = await supabase.rpc('purchase_study_plan', { p_student_id: plan.studentId, p_grade: plan.grade, p_subjects: plan.subjects, p_topics: plan.topics, p_week_start: plan.weekStart, p_plan: plan.days, p_price: plan.price });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return mapStudyPlan(row);
+}
+
+export async function updateStudyPlan(id: string, days: StudyDay[]): Promise<void> {
+  const { error } = await supabase.from('study_plans').update({ plan: days }).eq('id', id);
   if (error) throw error;
 }
 

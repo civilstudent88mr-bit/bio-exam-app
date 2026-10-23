@@ -141,7 +141,7 @@ export interface Note {
 }
 
 // --- Wallet transactions ---
-export type TxType = 'charge' | 'exam' | 'handout';
+export type TxType = 'charge' | 'exam' | 'handout' | 'study-plan';
 
 export interface Transaction {
   id: ID;
@@ -149,6 +149,41 @@ export interface Transaction {
   amount: number;
   type: TxType;
   description: string;
+  createdAt: ISODate;
+}
+
+export type StudyTaskType = 'study' | 'even-practice' | 'odd-practice' | 'chapter-review';
+
+export interface StudyTask {
+  id: string;
+  type: StudyTaskType;
+  title: string;
+  subject: string;
+  topic: string;
+  tests: number;
+  completed: boolean;
+  report: string;
+}
+
+export interface StudyDay {
+  day: number;
+  date: string;
+  title: string;
+  tasks: StudyTask[];
+  completed: boolean;
+  report: string;
+  actualMinutes: number;
+}
+
+export interface StudyPlan {
+  id: ID;
+  studentId: ID;
+  grade: string;
+  subjects: string[];
+  topics: string;
+  weekStart: string;
+  days: StudyDay[];
+  price: number;
   createdAt: ISODate;
 }
 
@@ -208,6 +243,7 @@ export interface Database {
   vaultFolders: VaultFolder[];
   notes: Note[];
   transactions: Transaction[];
+  studyPlans: StudyPlan[];
   handouts: Handout[];
   handoutPurchases: HandoutPurchase[];
   paymentSettings: PaymentSettings | null;
