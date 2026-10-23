@@ -18,6 +18,16 @@ async function verifyStudent(req: Request) {
   const students = await studentResponse.json() as Array<{ id: string }>;
   return students.length > 0;
 }
+async function configuredAI() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (!url || !service) return null;
+  const response = await fetch(`${url}/rest/v1/app_settings?select=ai_provider,ai_api_key&id=eq.1`, { headers: { apikey: service, Authorization: `Bearer ${service}` } });
+  if (!response.ok) return null;
+  const rows = await response.json() as Array<{ ai_provider?: string; ai_api_key?: string | null }>;
+  const row = rows[0];
+  return row?.ai_api_key ? { provider: row.ai_provider === 'openai' ? 'openai' : 'avalai', key: row.ai_api_key } : null;
+}
 function normalizeDays(value: unknown, weekStart: string) {
   const days = Array.isArray((value as { days?: unknown })?.days) ? (value as { days: unknown[] }).days : [];
   return Array.from({ length: 7 }, (_, index) => {
@@ -37,10 +47,12 @@ export default async function handler(req: Request, res: Response) {
     const topics = typeof body.topics === 'string' ? body.topics.trim() : '';
     const weekStart = typeof body.weekStart === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.weekStart) ? body.weekStart : '';
     if (!grade || subjects.length === 0 || !topics || !weekStart) return send(res, 400, { error: 'Grade, subjects, topics, and week start are required.' });
-    const apiKey = process.env.AVALAI_API_KEY || process.env.OPENAI_API_KEY;
-    if (!apiKey) return send(res, 503, { error: 'AI service is not configured.' });
-    const baseUrl = process.env.AVALAI_API_KEY ? 'https://api.avalai.ir/v1' : 'https://api.openai.com/v1';
-    const model = process.env.AI_STUDY_PLAN_MODEL || (process.env.AVALAI_API_KEY ? 'gemini-2.5-flash' : 'gpt-4o-mini');
+    const configured = await configuredAI();
+    const provider = configured?.provider || (process.env.AVALAI_API_KEY ? 'avalai' : 'openai');
+    const apiKey = configured?.key || process.env.AVALAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) return send(res, 503, { error: 'AI service is not configured. Ask the teacher to save the AI key.' });
+    const baseUrl = provider === 'avalai' ? 'https://api.avalai.ir/v1' : 'https://api.openai.com/v1';
+    const model = process.env.AI_STUDY_PLAN_MODEL || (provider === 'avalai' ? 'gemini-2.5-flash' : 'gpt-4o-mini');
     const response = await fetch(`${baseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model, temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: JSON.stringify({ grade, subjects, topics, weekStart }) }] }) });
     const providerBody = await response.text();
     if (!response.ok) return send(res, 502, { error: 'AI provider rejected the study plan request.', status: response.status });
