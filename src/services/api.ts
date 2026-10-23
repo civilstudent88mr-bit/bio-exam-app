@@ -392,7 +392,7 @@ export async function createExamResult(attempt: Omit<ExamAttempt, 'id'>): Promis
     started_at: attempt.startedAt, submitted_at: attempt.submittedAt,
     status: attempt.status, correct: attempt.correct, wrong: attempt.wrong,
     blank: attempt.blank, percentage: attempt.percentage,
-    time_spent_sec: attempt.timeSpentSec, score: attempt.score ?? null,
+    time_spent_sec: attempt.timeSpentSec, ...(attempt.score == null ? {} : { score: attempt.score }),
   }).select().single();
   if (error) throw error;
   return mapAttempt(data);
