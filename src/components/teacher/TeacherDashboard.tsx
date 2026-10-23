@@ -7,11 +7,12 @@ import { ExamManager } from './ExamManager';
 import { HandoutManager } from './HandoutManager';
 import { PaymentManager } from './PaymentManager';
 import { StudentDirectory } from './StudentDirectory';
+import { TeacherStudentPerformance } from './TeacherStudentPerformance';
 import { PageContainer, StatCard } from '@/components/Header';
-import { Building2, FileText, ClipboardList, Users, BookOpen, GraduationCap, Layers, FileUp, CreditCard } from 'lucide-react';
+import { Building2, FileText, ClipboardList, Users, BookOpen, GraduationCap, Layers, FileUp, CreditCard, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-type Tab = 'overview' | 'structure' | 'students' | 'questions' | 'exams' | 'handouts' | 'payments';
+type Tab = 'overview' | 'structure' | 'students' | 'performance' | 'questions' | 'exams' | 'handouts' | 'payments';
 
 export function TeacherDashboard() {
   const { db, teacherId } = useApp();
@@ -34,6 +35,7 @@ export function TeacherDashboard() {
     { id: 'payments', label: 'کارت‌به‌کارت و رسیدها', icon: <CreditCard size={18} /> },
   ];
   tabs.splice(2, 0, { id: 'students', label: '\u0641\u0647\u0631\u0633\u062a \u062f\u0627\u0646\u0634\u200c\u0622\u0645\u0648\u0632\u0627\u0646', icon: <Users size={18} /> });
+  tabs.splice(3, 0, { id: 'performance', label: '\u0631\u0648\u0646\u062f \u0639\u0645\u0644\u06a9\u0631\u062f', icon: <TrendingUp size={18} /> });
 
   return (
     <PageContainer>
@@ -90,6 +92,7 @@ export function TeacherDashboard() {
 
       {tab === 'structure' && <StructureManager />}
       {tab === 'students' && <StudentDirectory />}
+      {tab === 'performance' && <TeacherStudentPerformance />}
       {tab === 'questions' && <QuestionBank />}
       {tab === 'exams' && <ExamManager />}
       {tab === 'handouts' && <HandoutManager />}
