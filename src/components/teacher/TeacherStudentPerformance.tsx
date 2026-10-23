@@ -6,12 +6,41 @@ import { formatDate, getExamAnalytics, toFaNum } from '@/services/scoring';
 
 export function TeacherStudentPerformance() {
   const { db } = useApp();
+  const [schoolId, setSchoolId] = useState('');
+  const [classId, setClassId] = useState('');
   const [studentId, setStudentId] = useState('');
 
+  const schools = useMemo(() => [...db.schools].sort((a, b) => a.name.localeCompare(b.name, 'fa')), [db.schools]);
+  const classes = useMemo(() => [...db.classes].filter(item => item.schoolId === schoolId).sort((a, b) => a.name.localeCompare(b.name, 'fa')), [db.classes, schoolId]);
+  const students = useMemo(() => [...db.students].filter(item => item.classId === classId).sort((a, b) => a.name.localeCompare(b.name, 'fa')), [db.students, classId]);
+
   useEffect(() => {
-    if (!studentId && db.students.length > 0) setStudentId(db.students[0].id);
-    if (studentId && !db.students.some(student => student.id === studentId)) setStudentId(db.students[0]?.id || '');
-  }, [db.students, studentId]);
+    if (!schoolId && schools.length > 0) setSchoolId(schools[0].id);
+    if (schoolId && !schools.some(school => school.id === schoolId)) setSchoolId(schools[0]?.id || '');
+  }, [schoolId, schools]);
+
+  useEffect(() => {
+    if (!classId || !classes.some(item => item.id === classId)) setClassId(classes[0]?.id || '');
+  }, [classId, classes]);
+
+  useEffect(() => {
+    if (!studentId || !students.some(item => item.id === studentId)) setStudentId(students[0]?.id || '');
+  }, [studentId, students]);
+
+  const handleSchoolChange = (nextSchoolId: string) => {
+    const nextClasses = db.classes.filter(item => item.schoolId === nextSchoolId).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+    const nextClassId = nextClasses[0]?.id || '';
+    const nextStudents = db.students.filter(item => item.classId === nextClassId).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+    setSchoolId(nextSchoolId);
+    setClassId(nextClassId);
+    setStudentId(nextStudents[0]?.id || '');
+  };
+
+  const handleClassChange = (nextClassId: string) => {
+    const nextStudents = db.students.filter(item => item.classId === nextClassId).sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+    setClassId(nextClassId);
+    setStudentId(nextStudents[0]?.id || '');
+  };
 
   const student = db.students.find(item => item.id === studentId);
   const studentAttempts = useMemo(() => db.attempts
@@ -44,7 +73,11 @@ export function TeacherStudentPerformance() {
     <div className="card">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div><h3 className="font-bold flex items-center gap-2"><BarChart3 size={19} className="text-primary-500" /> روند و کارنامه دانش‌آموز</h3><p className="text-sm text-muted mt-1">نمایش تمام نتایج آزمون‌ها به تفکیک دانش‌آموز</p></div>
-        <div className="w-full sm:w-72"><Select value={studentId} onChange={setStudentId} options={db.students.map(item => ({ value: item.id, label: item.name }))} /></div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-[680px]">
+          <div><label className="text-xs text-muted block mb-1">مدرسه</label><Select value={schoolId} onChange={handleSchoolChange} options={schools.map(item => ({ value: item.id, label: item.name }))} /></div>
+          <div><label className="text-xs text-muted block mb-1">کلاس</label><Select value={classId} onChange={handleClassChange} options={classes.map(item => ({ value: item.id, label: item.name }))} /></div>
+          <div><label className="text-xs text-muted block mb-1">دانش‌آموز</label><Select value={studentId} onChange={setStudentId} options={students.map(item => ({ value: item.id, label: item.name }))} /></div>
+        </div>
       </div>
       {student && <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
         <div className="rounded-xl bg-primary-50 dark:bg-primary-900/20 p-3"><div className="font-bold">{student.name}</div><div className="text-xs text-muted mt-1">دانش‌آموز انتخاب‌شده</div></div>
