@@ -393,7 +393,11 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [files, setFiles] = useState<File[]>([]);
   const [answerFiles, setAnswerFiles] = useState<File[]>([]);
   const [answerFilePreviews, setAnswerFilePreviews] = useState<string[]>([]);
+  const [answerPdf, setAnswerPdf] = useState('');
+  const [answerPdfName, setAnswerPdfName] = useState('');
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [questionPdf, setQuestionPdf] = useState('');
+  const [questionPdfName, setQuestionPdfName] = useState('');
   const [aiGrade, setAiGrade] = useState('');
   const [aiChapter, setAiChapter] = useState('');
   const [aiSection, setAiSection] = useState('');
@@ -412,8 +416,10 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
       setAnswerText('');
       setFiles([]);
       setFilePreviews([]);
+      setQuestionPdf(''); setQuestionPdfName('');
       setAnswerFiles([]);
       setAnswerFilePreviews([]);
+      setAnswerPdf(''); setAnswerPdfName('');
       setAiGrade('');
       setAiChapter('');
       setAiSection('');
@@ -425,20 +431,18 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
     if (selected.length === 0) return;
+    const images = selected.filter(file => file.type.startsWith('image/'));
+    const pdf = selected.find(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
     const previews: string[] = [];
-    for (const f of selected) {
-      if (!f.type.startsWith('image/')) {
-        notify('فقط فایل تصویری قابل آپلود است', 'warning');
-        continue;
-      }
-      if (f.size > 10 * 1024 * 1024) {
-        notify(`فایل ${f.name} بزرگتر از ۱۰ مگابایت است`, 'warning');
-        continue;
-      }
-      const b64 = await fileToBase64(f);
-      previews.push(b64);
+    for (const file of images) {
+      if (file.size > 10 * 1024 * 1024) { notify('Image file is larger than 10 MB', 'warning'); continue; }
+      previews.push(await fileToBase64(file));
     }
-    setFiles(prev => [...prev, ...selected.filter(f => f.type.startsWith('image/'))]);
+    if (pdf) {
+      if (pdf.size > 3 * 1024 * 1024) notify('Question PDF is larger than 3 MB', 'warning');
+      else { setQuestionPdf(await fileToBase64(pdf)); setQuestionPdfName(pdf.name); }
+    }
+    setFiles(prev => [...prev, ...images]);
     setFilePreviews(prev => [...prev, ...previews]);
     e.target.value = '';
   };
@@ -467,16 +471,19 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
 
 
   const handleAnswerFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(e.target.files || []).filter(file => file.type.startsWith('image/'));
+    const selected = Array.from(e.target.files || []);
+    const images = selected.filter(file => file.type.startsWith('image/'));
+    const pdf = selected.find(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
     const previews: string[] = [];
-    for (const file of selected) {
-      if (file.size > 10 * 1024 * 1024) {
-        notify('Image is larger than 10 MB', 'warning');
-        continue;
-      }
+    for (const file of images) {
+      if (file.size > 10 * 1024 * 1024) { notify('Image file is larger than 10 MB', 'warning'); continue; }
       previews.push(await fileToBase64(file));
     }
-    setAnswerFiles(prev => [...prev, ...selected]);
+    if (pdf) {
+      if (pdf.size > 3 * 1024 * 1024) notify('Answer PDF is larger than 3 MB', 'warning');
+      else { setAnswerPdf(await fileToBase64(pdf)); setAnswerPdfName(pdf.name); }
+    }
+    setAnswerFiles(prev => [...prev, ...images]);
     setAnswerFilePreviews(prev => [...prev, ...previews]);
     e.target.value = '';
   };
@@ -493,7 +500,7 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
 
   const startExtraction = async () => {
     if (tab === 'paste' && !pasteText.trim()) { notify('متن سوالات را وارد کنید', 'warning'); return; }
-    if (tab === 'upload' && filePreviews.length === 0) { notify('حداقل یک تصویر آپلود کنید', 'warning'); return; }
+    if (tab === 'upload' && filePreviews.length === 0 && !questionPdf) { notify('Upload at least one question image or PDF', 'warning'); return; }
 
     setStep('processing');
     try {
@@ -506,6 +513,8 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
         sourceText: answerText.trim() || undefined,
         questionImageCount: filePreviews.length,
         answerImageCount: answerFilePreviews.length,
+        questionPdf,
+        answerPdf,
       };
       let result: Omit<Question, 'id' | 'createdAt'>[];
       if (tab === 'paste') {
@@ -595,7 +604,15 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                   <p className="text-xs text-primary-600 mt-1">تصویر را می‌توانید مستقیماً با Ctrl+V پیست کنید</p>
                   <p className="text-xs text-muted mt-1">JPG, PNG — حداکثر ۱۰ مگابایت</p>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileSelect} />
+                 {questionPdfName && (
+                   <div className="flex items-center justify-between rounded-xl px-3 py-2 text-sm" style={{ backgroundColor: 'rgb(var(--color-border) / 0.35)' }}>
+                     <span className="truncate">Question PDF: {questionPdfName}</span>
+                     <button type="button" className="btn btn-ghost p-1" onClick={() => { setQuestionPdf(''); setQuestionPdfName(''); }} aria-label="Remove question PDF">
+                       <X size={14} />
+                     </button>
+                   </div>
+                 )}
 
                 {filePreviews.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -622,7 +639,15 @@ function AiImportModal({ open, onClose }: { open: boolean; onClose: () => void }
                   <p className="text-sm font-medium">تصویر پاسخ تشریحی را آپلود یا با Ctrl+V پیست کنید</p>
                   <p className="text-xs text-muted mt-1">برای پاسخ تشریحی چند تصویر هم قابل افزودن است</p>
                 </div>
-                <input ref={answerFileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAnswerFileSelect} />
+                 <input ref={answerFileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleAnswerFileSelect} />
+                 {answerPdfName && (
+                   <div className="flex items-center justify-between rounded-xl px-3 py-2 text-sm" style={{ backgroundColor: 'rgb(var(--color-border) / 0.35)' }}>
+                     <span className="truncate">Answer PDF: {answerPdfName}</span>
+                     <button type="button" className="btn btn-ghost p-1" onClick={() => { setAnswerPdf(''); setAnswerPdfName(''); }} aria-label="Remove answer PDF">
+                       <X size={14} />
+                     </button>
+                   </div>
+                 )}
                 {answerFilePreviews.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {answerFilePreviews.map((src, idx) => (

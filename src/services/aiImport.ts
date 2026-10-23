@@ -35,6 +35,10 @@ export interface AIExtractOptions {
   provider?: 'avalai' | 'openai';
   apiKey?: string;
   sourceText?: string;
+  questionPdf?: string;
+  answerPdf?: string;
+  questionImageCount?: number;
+  answerImageCount?: number;
 }
 
 interface AIQuestion {
@@ -84,13 +88,22 @@ function normalizeQuestions(
 }
 
 async function callOpenAI(userContent: string, images: string[], opts: AIExtractOptions): Promise<AIQuestion[]> {
-  const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+  const content: Array<{ type: string; text?: string; image_url?: { url: string }; file?: { file_data: string } }> = [];
+  const questionImageCount = Math.max(0, Math.min(images.length, Number(opts.questionImageCount) || images.length));
+  const questionImages = images.slice(0, questionImageCount);
+  const answerImages = images.slice(questionImageCount);
 
   if (userContent) {
     content.push({ type: 'text', text: userContent });
   }
-  for (const img of images) {
+  if (opts.questionPdf) content.push({ type: 'file', file: { file_data: opts.questionPdf } });
+  for (const img of questionImages) {
     content.push({ type: 'image_url', image_url: { url: img } });
+  }
+  if (opts.answerPdf || answerImages.length > 0) {
+    content.push({ type: 'text', text: 'The next uploaded document or images are explanation/answer sources. Match each answer to its question number and copy explanations exactly.' });
+    if (opts.answerPdf) content.push({ type: 'file', file: { file_data: opts.answerPdf } });
+    for (const img of answerImages) content.push({ type: 'image_url', image_url: { url: img } });
   }
 
   if (content.length === 0) {
@@ -110,7 +123,7 @@ async function callOpenAI(userContent: string, images: string[], opts: AIExtract
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ text: userContent, images, options: opts, provider: opts.provider, apiKey: opts.apiKey }),
+    body: JSON.stringify({ text: userContent, images, options: opts, provider: opts.provider, apiKey: opts.apiKey, questionPdf: opts.questionPdf, answerPdf: opts.answerPdf }),
   });
 
   if (!res.ok) {

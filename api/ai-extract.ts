@@ -19,6 +19,7 @@ const MAX_REQUESTS_PER_WINDOW = 5;
 const MAX_IMAGES = 6;
 const MAX_IMAGE_DATA_URL_LENGTH = 7_000_000;
 const MAX_TEXT_LENGTH = 50_000;
+const MAX_PDF_DATA_URL_LENGTH = 4_000_000;
 const PROVIDER_BASE_URLS = { avalai: 'https://api.avalai.ir/v1', openai: 'https://api.openai.com/v1' } as const;
 
 const SYSTEM_PROMPT = `You are a strict exam-question transcription engine. Extract multiple-choice biology questions from the supplied text and images.\n\nNON-NEGOTIABLE SOURCE RULES:\n1. Treat supplied question images and text as the only source of truth. Transcribe exactly what is visible. Preserve Persian wording, punctuation, numbers, symbols, scientific names, and line meaning. Do not correct, rewrite, summarize, translate, or complete missing text from your own knowledge.\n2. Question images come first. Any images after the marker 'The final uploaded images are explanation images.' are explanation/answer images. Do not mix their content with question text.\n3. Explanation text or explanation images are the only source for the explanation field and correct answer. Copy the explanation faithfully, including all steps and details. Never shorten it or replace it with general knowledge.\n4. Select correctAnswer only when supported by supplied answer text or explanation image. Never solve from memory.\n5. Never invent options, explanations, or facts. If text is unreadable, keep the closest visible transcription instead of guessing.\n\nSPECIAL MULTI-STATEMENT RULE:\n- If the stem asks how many statements/items are correct (for example, "چند مورد صحیح است"), every line beginning with الف-, ب-, ج-, د- (or similar letter labels) belongs in the question text. Never put those statements into options.\n- For that format, options must be exactly ["یک مورد", "دو مورد", "سه مورد", "چهار مورد"] unless the source visibly provides a different count range. Determine correctAnswer only from the supplied explanation/answer source.\n- The question text must include the complete stem and all labeled statements in their original order.\n\nOUTPUT RULES:\n- Return JSON only, no Markdown or commentary.\n- Each question must have exactly four options.\n- correctAnswer is 1 to 4 and must match the supplied answer material.\n- difficulty is one of: ساده, متوسط, چالشی.\n- type is one of: مفهومی, خط‌به‌خط, ترکیبی, شکل‌دار, شمارشی.\n- Keep explanation as a faithful transcription, not a generated summary.\n- Exact shape: {\"questions\":[{\"text\":\"...\",\"options\":[\"...\",\"...\",\"...\",\"...\"],\"correctAnswer\":1,\"explanation\":\"...\",\"keyNote\":\"...\",\"difficulty\":\"متوسط\",\"type\":\"مفهومی\"}]}`;
@@ -101,23 +102,30 @@ export default async function handler(req: Request, res: Response) {
     if (!teacher?.userId) return send(res, 401, { error: 'Teacher authentication is invalid.', code: teacher?.errorCode || 'unauthorized' });
     if (!isAllowed(getClientKey(req, teacher.userId))) return send(res, 429, { error: 'تعداد درخواست‌ها زیاد است. یک دقیقه بعد دوباره تلاش کنید.' });
 
-    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; provider?: unknown; apiKey?: unknown; options?: { grade?: string; chapter?: string; section?: string; questionImageCount?: number; answerImageCount?: number } };
+    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}) as { text?: unknown; images?: unknown; questionPdf?: unknown; answerPdf?: unknown; provider?: unknown; apiKey?: unknown; options?: { grade?: string; chapter?: string; section?: string; questionImageCount?: number; answerImageCount?: number } };
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const images = Array.isArray(body.images) ? body.images.filter((image): image is string => typeof image === 'string') : [];
-    if (!text && images.length === 0) return send(res, 400, { error: 'متن یا تصویر ارسال نشده است.' });
+    const questionPdf = typeof body.questionPdf === 'string' ? body.questionPdf : '';
+    const answerPdf = typeof body.answerPdf === 'string' ? body.answerPdf : '';
+    if (!text && images.length === 0 && !questionPdf && !answerPdf) return send(res, 400, { error: 'No text, images, or PDF input provided.' });
     if (text.length > MAX_TEXT_LENGTH || images.length > MAX_IMAGES || images.some(image => image.length > MAX_IMAGE_DATA_URL_LENGTH)) return send(res, 413, { error: 'حجم ورودی بیش از حد مجاز است.' });
     if (images.some(image => !/^data:image\/(jpeg|png|webp|gif);base64,/i.test(image))) return send(res, 400, { error: 'فرمت تصویر مجاز نیست.' });
+    if ((questionPdf && !/^data:application\/pdf;base64,/i.test(questionPdf)) || (answerPdf && !/^data:application\/pdf;base64,/i.test(answerPdf))) return send(res, 400, { error: 'Invalid PDF format.' });
+    if (questionPdf.length > MAX_PDF_DATA_URL_LENGTH || answerPdf.length > MAX_PDF_DATA_URL_LENGTH) return send(res, 413, { error: 'PDF input is too large. Please upload a smaller PDF.' });
 
     const provider = body.provider === 'openai' ? 'openai' : 'avalai';
     const suppliedApiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
     const apiKey = suppliedApiKey || (provider === 'avalai' ? process.env.AVALAI_API_KEY : process.env.OPENAI_API_KEY);
     if (!apiKey) return send(res, 503, { error: 'سرویس هوش مصنوعی هنوز در تنظیمات سرور فعال نشده است.' });
-    const content: Array<{ type: 'text' | 'image_url'; text?: string; image_url?: { url: string; detail?: 'high' | 'low' | 'auto' } }> = [];
-    content.push({ type: 'text', text: `${text}\n\nپایه: ${body.options?.grade || 'نامشخص'}\nفصل: ${body.options?.chapter || 'نامشخص'}\nمبحث: ${body.options?.section || 'نامشخص'}` });
+    const content: Array<{ type: 'text' | 'image_url' | 'file'; text?: string; image_url?: { url: string; detail?: 'high' | 'low' | 'auto' }; file?: { file_data: string } }> = [];
+    content.push({ type: 'text', text: `${text}\n\nGrade: ${body.options?.grade || 'unknown'}\nChapter: ${body.options?.chapter || 'unknown'}\nSection: ${body.options?.section || 'unknown'}` });
     const questionImageCount = Math.max(0, Math.min(images.length, Number(body.options?.questionImageCount) || images.length));
-    for (const [index, image] of images.entries()) {
-      if (index === questionImageCount && index > 0) content.push({ type: 'text', text: 'The next images are explanation/answer images. Copy their explanation exactly and use them as the only source for correctAnswer.' });
-      content.push({ type: 'image_url', image_url: { url: image, detail: 'high' } });
+    if (questionPdf) content.push({ type: 'file', file: { file_data: questionPdf } });
+    for (const image of images.slice(0, questionImageCount)) content.push({ type: 'image_url', image_url: { url: image, detail: 'high' } });
+    if (answerPdf || images.length > questionImageCount) {
+      content.push({ type: 'text', text: 'The next uploaded PDF or images are explanation/answer sources. Match each answer to its question number and copy explanations exactly.' });
+      if (answerPdf) content.push({ type: 'file', file: { file_data: answerPdf } });
+      for (const image of images.slice(questionImageCount)) content.push({ type: 'image_url', image_url: { url: image, detail: 'high' } });
     }
 
     let openAiResponse: Response;
@@ -125,7 +133,7 @@ export default async function handler(req: Request, res: Response) {
       openAiResponse = await fetch(`${provider === 'avalai' ? PROVIDER_BASE_URLS.avalai : PROVIDER_BASE_URLS.openai}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: process.env.AI_VISION_MODEL || 'gpt-4o', messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0, max_tokens: 8000 }),
+        body: JSON.stringify({ model: (questionPdf || answerPdf) && provider === 'avalai' ? (process.env.AI_PDF_MODEL || 'gemini-2.5-flash') : (process.env.AI_VISION_MODEL || 'gpt-4o'), messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content }], response_format: { type: 'json_object' }, temperature: 0, max_tokens: 8000 }),
       });
     } catch (error) {
       console.error('AI provider request failed', error instanceof Error ? error.message : 'unknown error');
