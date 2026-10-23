@@ -31,7 +31,7 @@ const baseStyle = `
     .header .meta { font-size: 12px; color: #64748b; }
     .exam-code { text-align: center; margin: 12px 0; font-size: 13px; }
     .exam-code span { border: 1px solid #94a3b8; padding: 4px 16px; border-radius: 6px; letter-spacing: 2px; font-family: monospace; }
-    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .cols { display: block; width: 100%; }
     .q { margin-bottom: 16px; break-inside: avoid; }
     .q .num { font-weight: 700; color: #0f766e; }
     .opts { list-style: none; padding: 0; margin: 8px 0 0; }
