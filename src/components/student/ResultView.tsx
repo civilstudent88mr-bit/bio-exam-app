@@ -225,7 +225,7 @@ export function ResultView({ attempt, questions, onExit }: ResultViewProps) {
                             style={{ backgroundColor: isRightAns ? 'rgb(34 197 94 / 0.2)' : isUserAns ? 'rgb(239 68 68 / 0.2)' : 'rgb(var(--color-border) / 0.4)' }}>
                             {OPTION_LABELS[oi]}
                           </span>
-                          {opt}
+                          <span className="whitespace-pre-line">{opt}</span>
                           {isRightAns && <CheckCircle2 size={14} className="mr-auto" />}
                           {isUserAns && !isRightAns && <XCircle size={14} className="mr-auto" />}
                         </div>

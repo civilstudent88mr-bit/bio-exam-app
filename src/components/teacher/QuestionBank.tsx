@@ -234,7 +234,7 @@ export function QuestionBank() {
                           style={{ backgroundColor: i === q.correctAnswer ? 'rgb(34 197 94 / 0.15)' : 'rgb(var(--color-border) / 0.4)' }}>
                           {OPTION_LABELS[i]}
                         </span>
-                        {o}
+                        <span className="whitespace-pre-line">{o}</span>
                       </div>
                     ))}
                   </div>
@@ -351,7 +351,7 @@ export function QuestionBank() {
                         style={{ backgroundColor: i === q.correctAnswer ? 'rgb(34 197 94 / 0.15)' : 'rgb(var(--color-border) / 0.4)' }}>
                         {OPTION_LABELS[i]}
                       </span>
-                      {o}
+                      <span className="whitespace-pre-line">{o}</span>
                     </div>
                   ))}
                 </div>

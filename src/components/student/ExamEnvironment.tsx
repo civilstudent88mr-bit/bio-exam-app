@@ -188,7 +188,7 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
                       <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selected === i ? 'bg-primary-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-muted'}`}>
                         {selected === i ? <Check size={14} /> : OPTION_LABELS[i]}
                       </span>
-                      {opt}
+                      <span className="whitespace-pre-line">{opt}</span>
                     </button>
                   ))}
                 </div>
