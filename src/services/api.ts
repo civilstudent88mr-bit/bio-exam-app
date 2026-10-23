@@ -6,6 +6,13 @@ import type {
 } from '@/types';
 import { genExamCode, loadDb } from './storage';
 
+function formatQuestionText(text: string): string {
+  return text
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+(?=(?:الف|ب|ج|د)\s*[-–—:.)])/g, '\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .trim();
+}
 const MIGRATION_KEY = 'bio-exam-migrated';
 
 // ============================================================
@@ -60,7 +67,7 @@ function mapStudent(row: any): Student {
 }
 function mapQuestion(row: any): Question {
   return {
-    id: row.id, text: row.text, imageUrl: row.image_url || undefined, options: row.options,
+    id: row.id, text: formatQuestionText(row.text), imageUrl: row.image_url || undefined, options: row.options,
     correctAnswer: row.correct_answer, explanation: row.explanation,
     keyNote: row.key_note, grade: row.grade, chapter: row.chapter,
     section: row.section, difficulty: row.difficulty, type: row.type,
