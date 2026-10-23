@@ -9,7 +9,7 @@ import {
 import type { Question, Grade, Difficulty, QuestionType } from '@/types';
 import { questionCode } from '@/types';
 import { OPTION_LABELS, OPTION_NUMBERS } from '@/types';
-import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions, uploadQuestionImage } from '@/services/api';
+import { createQuestion, updateQuestion, deleteQuestion, batchCreateQuestions, uploadQuestionImage, formatQuestionText } from '@/services/api';
 import { parseCsv, parseFile, downloadSampleCsv, downloadSampleExcel } from '@/services/import';
 import { extractFromText, extractFromImages, fileToBase64 } from '@/services/aiImport';
 
@@ -226,7 +226,7 @@ export function QuestionBank() {
                     <Badge>{q.type}</Badge>
                     {q.chapter && <Badge color="neutral">{q.chapter}</Badge>}
                   </div>
-                  <p className="text-sm font-medium mb-2">{q.text}</p>{q.imageUrl && <img src={q.imageUrl} alt="شکل سوال" className="max-h-48 rounded-lg object-contain border mb-2" />}
+                  <p className="text-sm font-medium mb-2">{formatQuestionText(q.text)}</p>{q.imageUrl && <img src={q.imageUrl} alt="شکل سوال" className="max-h-48 rounded-lg object-contain border mb-2" />}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
                     {q.options.map((o, i) => (
                       <div key={i} className={`flex items-center gap-1.5 ${i === q.correctAnswer ? 'text-success-600 font-bold' : 'text-muted'}`}>
@@ -342,7 +342,7 @@ export function QuestionBank() {
               <div key={idx} className="card space-y-2" style={{ backgroundColor: 'rgb(var(--color-border) / 0.2)' }}>
                 <div className="flex items-start gap-2">
                   <span className="badge bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300 shrink-0">{idx + 1}</span>
-                  <p className="text-sm font-medium flex-1">{q.text}</p>
+                  <p className="text-sm font-medium flex-1">{formatQuestionText(q.text)}</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
                   {q.options.map((o, i) => (

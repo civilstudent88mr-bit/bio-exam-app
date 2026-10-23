@@ -6,10 +6,10 @@ import type {
 } from '@/types';
 import { genExamCode, loadDb } from './storage';
 
-function formatQuestionText(text: string): string {
+export function formatQuestionText(text: string): string {
   return text
     .replace(/\r\n?/g, '\n')
-    .replace(/\s*(?=(?:\u0627\u0644\u0641|\u0628|\u062c|\u062f)[\s\u200c]*(?:\u0640|[-\u2013\u2014:.)]))/g, '\n')
+    .replace(/(^|[^\p{L}\u200c])\s+(?=(?:\u0627\u0644\u0641|\u0628|\u062c|\u062f)[\s\u200c]*(?:\u0640|[-\u2013\u2014:.)]))/gu, '$1\n')
     .replace(/[ \t]*\n[ \t]*/g, '\n')
     .trim();
 }

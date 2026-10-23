@@ -5,7 +5,7 @@ import { Modal, ConfirmModal } from '@/components/ui/Modal';
 import { Clock, Star, Check, ChevronRight, ChevronLeft, Flag, AlertCircle, X, Loader2 } from 'lucide-react';
 import type { Exam, SelfQuiz, ExamAttempt, Question } from '@/types';
 import { OPTION_LABELS } from '@/types';
-import { addQuestionsToAssessmentBinder, createExamResult } from '@/services/api';
+import { addQuestionsToAssessmentBinder, createExamResult, formatQuestionText } from '@/services/api';
 import { gradeAnswers, formatTime, toFaNum } from '@/services/scoring';
 
 interface ExamEnvProps {
@@ -43,13 +43,14 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
 
   useEffect(() => {
     if (timeLeft === null) return;
-    if (timeLeft <= 0) { handleSubmit(true); return; }
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => (prev !== null ? prev - 1 : null));
-    }, 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    if (timeLeft <= 0) {
+      handleSubmit(true);
+      return;
+    }
+    const timer = setTimeout(() => setTimeLeft(previous => (previous === null ? null : previous - 1)), 1000);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft === null]);
+  }, [timeLeft]);
 
   const totalPages = Math.ceil(questions.length / perPage);
   const pageQuestions = questions.slice(currentPage * perPage, (currentPage + 1) * perPage);
@@ -64,6 +65,7 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
   };
 
   const handleSubmit = (auto = false) => {
+    if (submitting) return;
     if (!auto && answeredCount < questions.length) {
       setShowSubmitConfirm(true);
       return;
@@ -179,7 +181,7 @@ export function ExamEnvironment({ exam, quiz, onExit, onComplete }: ExamEnvProps
                     <Star size={18} fill={isBookmarked ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <p className="text-sm font-medium mb-4 leading-relaxed">{q.text}</p>{q.imageUrl && <img src={q.imageUrl} alt="شکل سوال" className="max-h-72 w-full rounded-lg border object-contain mb-4" />}
+                <p className="text-sm font-medium mb-4 leading-relaxed">{formatQuestionText(q.text)}</p>{q.imageUrl && <img src={q.imageUrl} alt="شکل سوال" className="max-h-72 w-full rounded-lg border object-contain mb-4" />}
                 <div className="grid grid-cols-1 gap-2">
                   {q.options.map((opt, i) => (
                     <button key={i} className={`flex items-center gap-3 p-3 rounded-xl text-right text-sm transition-all ${selected === i ? 'bg-primary-50 dark:bg-primary-900/30 border-2 border-primary-400' : 'border-2 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}

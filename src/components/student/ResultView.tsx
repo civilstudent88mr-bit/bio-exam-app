@@ -15,6 +15,7 @@ import {
   createVaultFolder, updateVaultFolder, deleteVaultFolder,
   createNote, deleteNote,
 } from '@/services/api';
+import { formatQuestionText } from '@/services/api';
 
 interface ResultViewProps {
   attempt: ExamAttempt;
@@ -214,7 +215,7 @@ export function ResultView({ attempt, questions, onExit }: ResultViewProps) {
                       <NotebookPen size={14} />
                     </button>
                   </div>
-                  <p className="text-sm font-medium mb-3">{q.text}</p>
+                  <p className="text-sm font-medium mb-3">{formatQuestionText(q.text)}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm">
                     {q.options.map((opt, oi) => {
                       const isUserAns = ans === oi;
